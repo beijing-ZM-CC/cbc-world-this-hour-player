@@ -171,7 +171,7 @@
       navigator.mediaSession.metadata = new MediaMetadata({
         title: currentEpisode.display_title || currentEpisode.title || "The World This Hour",
         artist: `CBC Radio · ${currentEpisode.feed_name || "News"}`,
-        album: "CBC 双语字幕播放器",
+        album: "双子座 · CBC 双语字幕播放器",
         artwork: [
           { src: iconUrl, sizes: "512x512", type: "image/png" },
         ],
