@@ -33,9 +33,9 @@ AUDIO_ARCHIVE_LIMITS = {
 }
 MAX_AUDIO_TOTAL_BYTES = 85 * 1024 * 1024  # Hard cap: 85 MB total MP3s so Pages deploy never exceeds 100 MB
 AUTO_TRANSCRIBE_TOP = {
-    "twth": 1,   # Always transcribe newest hourly episode (previous hours stay archived)
-    "wr": 2,     # Ensure latest 2 World Report episodes have ready bilingual subtitles
-    "ywt": 1,    # Ensure latest 1 Your World Tonight episode has ready bilingual subtitles
+    "twth": 48,  # Every archived hourly episode has full paragraphed bilingual subtitles
+    "wr": 7,     # All 7 World Report episodes have full paragraphed bilingual subtitles
+    "ywt": 5,    # All 5 Your World Tonight episodes have full paragraphed bilingual subtitles
 }
 
 
@@ -196,10 +196,16 @@ async def build_static_site(out_dir: Path, prev_site_url: str | None, seed_local
             key = feed["key"]
             top_n = AUTO_TRANSCRIBE_TOP.get(key, 0)
             feed_eps = [e for e in kept_episodes if e.get("feed_key") == key]
-            for ep in feed_eps[:top_n]:
+            audio_cap = AUDIO_ARCHIVE_LIMITS.get(key, 0)
+            for idx, ep in enumerate(feed_eps[:top_n]):
                 ep_id = ep["id"]
                 sub_file = sub_dir / f"{ep_id}.json"
                 aud_file = audio_dir / f"{ep_id}.mp3"
+
+                need_sub = not sub_file.exists() or sub_file.stat().st_size < 20
+                need_audio = idx < audio_cap
+                if not need_sub and not need_audio:
+                    continue
 
                 if not aud_file.exists() or aud_file.stat().st_size < 1000:
                     logger.info("Downloading audio for %s (%s)...", ep_id, ep.get("display_title"))
@@ -210,7 +216,7 @@ async def build_static_site(out_dir: Path, prev_site_url: str | None, seed_local
                 ep["has_audio"] = True
                 ep["static_audio_path"] = f"data/audio/{ep_id}.mp3"
 
-                if not sub_file.exists() or sub_file.stat().st_size < 20:
+                if need_sub:
                     logger.info("Transcribing & translating %s...", ep_id)
                     model = proc._get_model()
                     audio_array = _decode_audio_16k_mono(aud_file)

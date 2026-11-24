@@ -73,16 +73,16 @@ def _translate_batch_en_to_zh(texts: list[str]) -> list[str]:
         return []
 
     results: list[str] = []
-    batch_size = 15
+    batch_size = 18
 
-    with httpx.Client(timeout=20.0, headers=HTTP_HEADERS) as client:
+    with httpx.Client(timeout=25.0, headers=HTTP_HEADERS) as client:
         for i in range(0, len(texts), batch_size):
             chunk = [t.replace("\n", " ").strip() for t in texts[i : i + batch_size]]
             joined = "\n".join(chunk)
             translated_chunk: list[str] | None = None
 
             if len(joined) <= 4500:
-                for attempt in range(2):
+                for attempt in range(3):
                     try:
                         out = _google_gtx_translate(client, joined)
                         lines = [line.strip() for line in out.splitlines() if line.strip() != ""]
@@ -91,7 +91,7 @@ def _translate_batch_en_to_zh(texts: list[str]) -> list[str]:
                             break
                     except Exception as exc:
                         logger.warning("Batch GTX translate attempt %d failed: %s", attempt + 1, exc)
-                        time.sleep(0.5)
+                        time.sleep(1.5 * (attempt + 1))
 
             if translated_chunk is None:
                 translated_chunk = []
@@ -112,10 +112,11 @@ def _translate_batch_en_to_zh(texts: list[str]) -> list[str]:
                         except Exception:
                             pass
                     translated_chunk.append(translated_line or line)
-                    time.sleep(0.12)
+                    time.sleep(0.25)
 
             results.extend(translated_chunk)
-            time.sleep(0.25)
+            if i + batch_size < len(texts):
+                time.sleep(0.85)
 
     return results
 
