@@ -6,9 +6,9 @@
   --border-strong: #bcc8d4;
   --text: #0f172a;
   --muted: #5b697a;
-  --primary: #c8102e;
-  --primary-hover: #a80d26;
-  --primary-soft: rgba(200, 16, 46, 0.11);
+  --primary: #d92626;
+  --primary-hover: #b81d1d;
+  --primary-soft: rgba(217, 38, 38, 0.10);
   --primary-fg: #ffffff;
   --hover-bg: rgba(15, 23, 42, 0.05);
   --track-bg: rgba(15, 23, 42, 0.12);
@@ -16,6 +16,23 @@
   --success: #16a34a;
   --shadow: 0 2px 10px rgba(15, 23, 42, 0.05);
   --menu-shadow: 0 12px 30px rgba(15, 23, 42, 0.16);
+
+  /* 三档字号（正常 / 中 / 大） */
+  --prose-size: 15.5px;
+  --prose-line: 1.74;
+  --prose-size-sm: 14px;
+}
+
+[data-font-size="medium"] {
+  --prose-size: 18.5px;
+  --prose-line: 1.78;
+  --prose-size-sm: 16.5px;
+}
+
+[data-font-size="large"] {
+  --prose-size: 22px;
+  --prose-line: 1.82;
+  --prose-size-sm: 19.5px;
 }
 
 [data-theme="dark"] {
@@ -26,9 +43,9 @@
   --border-strong: #36475e;
   --text: #eef2f7;
   --muted: #8b9bb0;
-  --primary: #e63950;
-  --primary-hover: #f24c62;
-  --primary-soft: rgba(230, 57, 80, 0.18);
+  --primary: #e63946;
+  --primary-hover: #f24c58;
+  --primary-soft: rgba(230, 57, 70, 0.18);
   --primary-fg: #ffffff;
   --hover-bg: rgba(255, 255, 255, 0.06);
   --track-bg: rgba(255, 255, 255, 0.14);
@@ -57,88 +74,80 @@ html, body {
   display: none !important;
 }
 
-.mobile-only {
-  display: none !important;
-}
-
 .app-shell {
   display: flex;
   flex-direction: column;
   height: 100vh;
   height: 100dvh;
   width: 100%;
-  padding: 12px 16px 14px;
-  gap: 10px;
+  padding: 10px 14px calc(12px + env(safe-area-inset-bottom));
+  gap: 8px;
 }
 
-/* 1. 顶部播放控制栏 */
-.control-bar {
+/* 1. 固定节目标题栏（始终保持在最上方 order: 1 不动） */
+.title-header {
+  order: 1;
   background: var(--card);
   border: 1px solid var(--border);
   border-radius: 10px;
   padding: 8px 14px;
   box-shadow: var(--shadow);
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  justify-content: space-between;
-  gap: 8px;
   flex-shrink: 0;
 }
 
-.brand-picker {
+.brand-title {
   display: flex;
   align-items: center;
-  gap: 8px;
-  min-width: 0;
-  flex: 1 1 220px;
+  gap: 10px;
+  width: 100%;
 }
 
-.cbc-badge {
+.gemini-badge {
   display: inline-flex;
   align-items: center;
   gap: 6px;
   padding: 5px 11px;
   border-radius: 999px;
-  font-size: 13px;
-  font-weight: 800;
+  font-size: 13.5px;
+  font-weight: 700;
   letter-spacing: 0.04em;
-  background: var(--primary-soft);
-  border: 1px solid color-mix(in srgb, var(--primary) 28%, var(--border));
-  color: var(--primary);
+  background: var(--primary);
+  border: 1px solid var(--primary);
+  color: #ffffff;
   white-space: nowrap;
+  flex-shrink: 0;
+  cursor: pointer;
+  user-select: none;
+  transition: transform 0.1s ease;
+}
+
+.gemini-badge:active {
+  transform: scale(0.94);
+}
+
+.gemini-icon {
+  display: block;
+  width: 15px;
+  height: 15px;
+  background: transparent;
+  color: #ffffff;
   flex-shrink: 0;
 }
 
-.live-dot {
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
-  background: var(--success);
-  animation: pulseDot 1.8s ease-in-out infinite;
-}
-
-@keyframes pulseDot {
-  0%, 100% { opacity: 1; transform: scale(1); }
-  50% { opacity: 0.45; transform: scale(0.78); }
-}
-
 .episode-select-wrap {
-  position: relative;
   flex: 1 1 auto;
-  min-width: 150px;
-  max-width: 340px;
+  min-width: 0;
 }
 
 .episode-select {
   width: 100%;
-  height: 34px;
-  padding: 0 24px 0 9px;
+  height: 36px;
+  padding: 0 26px 0 10px;
   border-radius: 8px;
   border: 1px solid var(--border-strong);
   background: var(--header-bg);
   color: var(--text);
-  font-size: 12.5px;
+  font-size: 13.5px;
   font-weight: 500;
   cursor: pointer;
   outline: none;
@@ -152,21 +161,55 @@ html, body {
   box-shadow: 0 0 0 2px var(--primary-soft);
 }
 
-.playback-controls {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 6px;
+.episode-index-badge {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-variant-numeric: tabular-nums;
+  font-size: 12.5px;
+  color: var(--muted);
+  white-space: nowrap;
   flex-shrink: 0;
 }
 
-.right-tools {
+/* 2. 可整体切换位置的控制面板（默认在上方 order: 2；点击“按钮底部”后切为 order: 4） */
+.controls-dock {
+  order: 2;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+.app-shell.controls-bottom .controls-dock {
+  order: 4;
+  flex-direction: column-reverse;
+}
+
+.controls-panel {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 8px 14px;
+  box-shadow: var(--shadow);
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px 10px;
+}
+
+.primary-controls-row {
   display: flex;
   align-items: center;
-  justify-content: flex-end;
-  gap: 6px;
+  gap: 8px;
   flex-wrap: nowrap;
-  flex: 0 1 auto;
+}
+
+.utility-controls-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
 }
 
 .btn {
@@ -174,16 +217,16 @@ html, body {
   align-items: center;
   justify-content: center;
   gap: 5px;
-  height: 34px;
-  padding: 0 10px;
+  height: 36px;
+  padding: 0 11px;
   border-radius: 8px;
   border: 1px solid var(--border);
   background: var(--header-bg);
   color: var(--text);
-  font-size: 12.5px;
+  font-size: 13px;
   font-weight: 500;
   cursor: pointer;
-  transition: background 0.15s ease, border-color 0.15s ease, transform 0.08s ease;
+  transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease, transform 0.08s ease;
   white-space: nowrap;
 }
 
@@ -205,9 +248,10 @@ html, body {
   background: var(--primary);
   border-color: var(--primary);
   color: var(--primary-fg);
-  font-weight: 600;
-  min-width: 84px;
-  padding: 0 14px;
+  font-weight: 700;
+  min-width: 92px;
+  padding: 0 18px;
+  box-shadow: 0 2px 8px color-mix(in srgb, var(--primary) 30%, transparent);
 }
 
 .btn-primary:hover {
@@ -215,30 +259,33 @@ html, body {
   border-color: var(--primary-hover);
 }
 
-.btn-install {
+/* 同步滚动激活态（类似参考图红框红底锁图标） */
+.btn-scroll-mode.active-sync {
   background: var(--primary-soft);
-  border-color: var(--primary);
+  border-color: color-mix(in srgb, var(--primary) 42%, var(--border));
   color: var(--primary);
   font-weight: 600;
 }
 
+.btn-play-mode[data-mode="loop_para"],
 .btn-play-mode[data-mode="repeat_one"],
-.btn-play-mode[data-mode="shuffle"] {
+.btn-play-mode[data-mode="shuffle"],
+.btn-install {
   background: var(--primary-soft);
-  border-color: color-mix(in srgb, var(--primary) 35%, var(--border));
+  border-color: color-mix(in srgb, var(--primary) 40%, var(--border));
   color: var(--primary);
   font-weight: 600;
 }
 
 .btn-icon {
-  width: 34px;
+  width: 36px;
   padding: 0;
 }
 
 .btn-mono {
   font-variant-numeric: tabular-nums;
   font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
-  min-width: 46px;
+  min-width: 50px;
 }
 
 .volume-group {
@@ -248,12 +295,12 @@ html, body {
 }
 
 .volume-slider {
-  width: 52px;
+  width: 54px;
   accent-color: var(--primary);
   cursor: pointer;
 }
 
-/* 保存下拉菜单 */
+/* 保存下拉菜单（底部模式自动向上展开，避免超出屏幕） */
 .save-menu-wrap {
   position: relative;
 }
@@ -272,6 +319,11 @@ html, body {
   display: none;
   flex-direction: column;
   gap: 3px;
+}
+
+.app-shell.controls-bottom .save-dropdown {
+  top: auto;
+  bottom: calc(100% + 6px);
 }
 
 .save-dropdown.open {
@@ -328,14 +380,13 @@ html, body {
   margin: 4px 6px;
 }
 
-/* 2. 中部超长全宽播放进度条 */
+/* 超长全宽播放进度条 */
 .progress-bar-section {
   background: var(--card);
   border: 1px solid var(--border);
   border-radius: 10px;
-  padding: 10px 18px 12px;
+  padding: 8px 16px 10px;
   box-shadow: var(--shadow);
-  flex-shrink: 0;
 }
 
 .progress-meta {
@@ -345,7 +396,7 @@ html, body {
   gap: 12px;
   font-size: 12px;
   color: var(--muted);
-  margin-bottom: 6px;
+  margin-bottom: 4px;
 }
 
 .progress-meta-left, .progress-meta-right {
@@ -392,7 +443,7 @@ html, body {
 .progress-hit {
   position: relative;
   width: 100%;
-  height: 26px;
+  height: 24px;
   display: flex;
   align-items: center;
   cursor: pointer;
@@ -403,7 +454,7 @@ html, body {
 .progress-track {
   position: relative;
   width: 100%;
-  height: 9px;
+  height: 8px;
   border-radius: 999px;
   background: var(--track-bg);
   overflow: hidden;
@@ -431,8 +482,8 @@ html, body {
   top: 50%;
   left: 0%;
   transform: translate(-50%, -50%);
-  width: 18px;
-  height: 18px;
+  width: 17px;
+  height: 17px;
   border-radius: 50%;
   background: var(--primary);
   border: 2.5px solid var(--card);
@@ -446,13 +497,14 @@ html, body {
   transform: translate(-50%, -50%) scale(1.22);
 }
 
-/* 3. 底部字幕展示区 */
+/* 3. 字幕展示区（固定在中间 order: 3） */
 .subtitles-grid {
+  order: 3;
   flex: 1 1 auto;
   min-height: 0;
   display: grid;
   grid-template-columns: 1fr;
-  gap: 12px;
+  gap: 10px;
 }
 
 .subtitles-grid.mode-split .stack-only {
@@ -474,7 +526,6 @@ html, body {
   overflow: hidden;
 }
 
-/* 左右双栏锁定对齐标题栏（与下方段落网格 1fr 1fr 严格同宽对齐） */
 .split-sync-header {
   display: grid;
   grid-template-columns: 1fr 1fr;
@@ -507,15 +558,10 @@ html, body {
 }
 
 .panel-title {
-  font-size: 13px;
+  font-size: 12.5px;
   font-weight: 700;
-  color: var(--text);
-}
-
-.panel-header-right {
-  display: flex;
-  align-items: center;
-  gap: 8px;
+  letter-spacing: 0.04em;
+  color: var(--muted);
 }
 
 .line-counter {
@@ -523,24 +569,6 @@ html, body {
   font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
   font-variant-numeric: tabular-nums;
   color: var(--muted);
-}
-
-.btn-follow {
-  height: 24px;
-  padding: 0 10px;
-  border: none;
-  border-radius: 999px;
-  background: var(--primary);
-  color: var(--primary-fg);
-  font-size: 12px;
-  font-weight: 600;
-  cursor: pointer;
-  display: none;
-}
-
-.btn-follow.visible {
-  display: inline-flex;
-  align-items: center;
 }
 
 .subtitle-scroll {
@@ -554,6 +582,12 @@ html, body {
   scrollbar-color: var(--border-strong) transparent;
 }
 
+/* 同步滚动锁定状态：禁止手工滚轮/手指滑动/拖拽滚动条，仅由音频程序自动平滑滚动 */
+.subtitle-scroll.scroll-locked {
+  overflow-y: hidden;
+  touch-action: none;
+}
+
 .subtitle-scroll::-webkit-scrollbar {
   width: 6px;
 }
@@ -563,7 +597,7 @@ html, body {
   border-radius: 999px;
 }
 
-/* 锁定对齐的双栏段落行：左英右中始终处于同一网格行，顶边/高度完全对齐、永久同步滚动 */
+/* 锁定对齐的双栏段落行：左英右中永远共享同一行顶边与高度、永久同步滚动 */
 .para-pair-row {
   display: grid;
   grid-template-columns: 1fr 1fr;
@@ -608,8 +642,8 @@ html, body {
 
 .para-prose {
   margin: 0;
-  font-size: 16px;
-  line-height: 1.78;
+  font-size: var(--prose-size);
+  line-height: var(--prose-line);
   color: var(--muted);
   word-break: break-word;
 }
@@ -638,7 +672,6 @@ html, body {
   font-weight: 600;
 }
 
-/* 手机竖屏双语交错段落卡片 */
 .stack-para-card {
   margin-bottom: 12px;
 }
@@ -650,17 +683,6 @@ html, body {
   opacity: 0.75;
 }
 
-.stack-en {
-  font-size: 15.5px;
-  line-height: 1.65;
-}
-
-.stack-zh {
-  font-size: 15px;
-  line-height: 1.68;
-}
-
-/* 状态提示 */
 .status-placeholder {
   display: flex;
   flex-direction: column;
@@ -720,76 +742,136 @@ html, body {
   transform: translateX(-50%) translateY(0);
 }
 
-/* Android 手机竖屏专属单手体验：顶栏选期数+工具，中间全屏读字幕，底部固定进度条+大拇指播控 */
+/* 双子座彩蛋居中弹窗 */
+.easter-overlay {
+  position: fixed;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(15, 23, 42, 0.32);
+  backdrop-filter: blur(3px);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.22s ease;
+  z-index: 120;
+}
+
+.easter-overlay.show {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.easter-card {
+  border-radius: 22px;
+  overflow: hidden;
+  box-shadow: 0 20px 50px rgba(0, 0, 0, 0.28);
+  transform: scale(0.65);
+  transition: transform 0.34s cubic-bezier(0.34, 1.56, 0.64, 1);
+  background: #faf0e2;
+  cursor: pointer;
+}
+
+.easter-overlay.show .easter-card {
+  transform: scale(1);
+}
+
+.easter-img {
+  display: block;
+  width: min(300px, 76vw);
+  height: auto;
+  user-select: none;
+  -webkit-user-drag: none;
+}
+
+/* 手机竖屏自适应（严格保持：节目标题栏永远置顶，控制区整体随“按钮底部/按钮顶部”在上下切换） */
 @media (max-width: 760px) {
   .desktop-only {
     display: none !important;
   }
-  .mobile-only {
-    display: inline-flex !important;
-  }
 
   .app-shell {
     padding: 8px 8px calc(10px + env(safe-area-inset-bottom));
-    gap: 8px;
+    gap: 7px;
   }
 
-  /* 拆分控制栏：brand-picker + right-tools 在顶部，playback-controls 放到最底部 */
-  .control-bar {
-    display: contents;
+  .title-header {
+    padding: 7px 10px;
   }
 
-  .brand-picker {
-    order: 1;
-    background: var(--card);
-    border: 1px solid var(--border);
-    border-radius: 10px;
-    padding: 8px 10px;
-    flex: 0 0 auto;
-    width: 100%;
-    box-shadow: var(--shadow);
-  }
-
-  .episode-select-wrap {
-    max-width: none;
-  }
-
-  .episode-select {
-    height: 36px;
+  .gemini-badge {
+    padding: 4px 8px;
     font-size: 13px;
   }
 
-  .right-tools {
-    order: 2;
+  .episode-select {
+    height: 34px;
+    font-size: 12.5px;
+  }
+
+  .controls-panel {
+    padding: 8px 8px;
+    gap: 7px;
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .primary-controls-row {
+    width: 100%;
+    display: grid;
+    grid-template-columns: 1fr 1.25fr 1fr 1.15fr;
+    gap: 6px;
+  }
+
+  .primary-controls-row .btn {
+    height: 40px;
+    padding: 0 6px;
+    font-size: 12.5px;
+    min-width: 0;
+  }
+
+  .utility-controls-row {
     width: 100%;
     justify-content: space-between;
     gap: 5px;
-    flex: 0 0 auto;
-    flex-wrap: nowrap;
   }
 
-  .right-tools .btn {
-    height: 34px;
-    padding: 0 7px;
+  .utility-controls-row .btn {
+    height: 32px;
+    padding: 0 8px;
     font-size: 11.5px;
     gap: 4px;
+    flex: 1 1 auto;
   }
 
-  .right-tools .btn-icon {
-    width: 34px;
+  .utility-controls-row .btn-icon {
+    flex: 0 0 32px;
+    width: 32px;
     padding: 0;
   }
 
-  .subtitles-grid {
-    order: 3;
-    gap: 8px;
+  .utility-controls-row .save-menu-wrap {
+    flex: 1 1 auto;
+    display: flex;
+  }
+
+  .utility-controls-row .save-menu-wrap > .btn {
+    width: 100%;
+  }
+
+  .progress-bar-section {
+    padding: 6px 12px 7px;
+  }
+
+  .episode-meta-hint {
+    display: none;
   }
 
   .split-col-head {
-    padding: 8px 10px;
+    padding: 7px 10px;
   }
 
-  .split-sync-scroll {
+  .subtitle-scroll {
     padding: 10px 8px 40vh;
   }
 
@@ -798,71 +880,20 @@ html, body {
     margin-bottom: 10px;
   }
 
-  .para-pair-row .para-card {
-    padding: 9px 10px;
-  }
-
-  .para-pair-row .para-prose {
-    font-size: 13.5px;
-    line-height: 1.62;
-  }
-
-  .progress-bar-section {
-    order: 4;
-    padding: 8px 12px 6px;
-    border-radius: 10px 10px 0 0;
-    margin-bottom: -8px;
-    border-bottom: none;
-  }
-
-  .episode-meta-hint {
-    display: none;
-  }
-
-  .playback-controls {
-    order: 5;
-    width: 100%;
-    background: var(--card);
-    border: 1px solid var(--border);
-    border-top: none;
-    border-radius: 0 0 12px 12px;
-    padding: 4px 10px 10px;
-    gap: 10px;
-    justify-content: space-evenly;
-    box-shadow: var(--shadow);
-  }
-
-  .playback-controls .btn {
-    height: 44px;
-    font-size: 14px;
-    border-radius: 10px;
-  }
-
-  .playback-controls .btn-seek {
-    flex: 1 1 0;
-  }
-
-  .playback-controls .btn-primary {
-    flex: 1.4 1 0;
-    min-width: 112px;
-    font-size: 15px;
-  }
-
-  .playback-controls .btn-mono {
-    min-width: 54px;
-    padding: 0 8px;
-  }
-
-  .subtitle-line {
+  .para-card {
     padding: 10px 10px;
-    font-size: 15px;
+  }
+
+  .para-prose {
+    font-size: var(--prose-size-sm);
+    line-height: 1.66;
   }
 
   .save-dropdown {
-    right: -36px;
+    right: -12px;
   }
 
-  .toast {
-    bottom: 126px;
+  .app-shell.controls-bottom .toast {
+    bottom: 196px;
   }
 }

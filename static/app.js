@@ -6,25 +6,59 @@
   };
   const SPEEDS = [1.0, 1.25, 1.5, 0.75];
 
+  const PLAY_MODE_ORDER = ["sequential", "loop_para", "repeat_one", "shuffle"];
+  const PLAY_MODE_META = {
+    sequential: { label: "顺次播放", tip: "当前：顺次播放（播完自动播放下一期）" },
+    loop_para: { label: "本段循环", tip: "当前：本段循环（反复循环播放当前段落）" },
+    repeat_one: { label: "单曲循环", tip: "当前：单曲循环（播完重复播放本期）" },
+    shuffle: { label: "随机播放", tip: "当前：随机播放（播完随机切换下一期）" },
+  };
+
+  const FONT_SIZE_ORDER = ["normal", "medium", "large"];
+  const FONT_SIZE_LABELS = {
+    normal: "字号:正常",
+    medium: "字号:中",
+    large: "字号:大",
+  };
+
+  const appShell = document.getElementById("app-shell");
+  const geminiBadge = document.getElementById("gemini-badge");
+  const easterOverlay = document.getElementById("easter-overlay");
+  const easterImg = document.getElementById("easter-img");
   const audio = document.getElementById("audio-player");
   const episodeSelect = document.getElementById("episode-select");
+  const episodeIndexBadge = document.getElementById("episode-index-badge");
+
+  const btnPrevPara = document.getElementById("btn-prev-para");
   const btnPlay = document.getElementById("btn-play");
   const iconPlay = document.getElementById("icon-play");
   const iconPause = document.getElementById("icon-pause");
   const labelPlay = document.getElementById("label-play");
-  const btnRew = document.getElementById("btn-rew");
-  const btnFwd = document.getElementById("btn-fwd");
+  const btnNextPara = document.getElementById("btn-next-para");
+
+  const btnPlayMode = document.getElementById("btn-play-mode");
+  const iconModeSequential = document.getElementById("icon-mode-sequential");
+  const iconModeLoopPara = document.getElementById("icon-mode-loop-para");
+  const iconModeRepeat = document.getElementById("icon-mode-repeat");
+  const iconModeShuffle = document.getElementById("icon-mode-shuffle");
+  const labelPlayMode = document.getElementById("label-play-mode");
+
+  const btnScrollMode = document.getElementById("btn-scroll-mode");
+  const iconScrollLock = document.getElementById("icon-scroll-lock");
+  const iconScrollFree = document.getElementById("icon-scroll-free");
+  const labelScrollMode = document.getElementById("label-scroll-mode");
+
+  const btnFontSize = document.getElementById("btn-font-size");
+  const labelFontSize = document.getElementById("label-font-size");
+
+  const btnDockPos = document.getElementById("btn-dock-pos");
+  const labelDockPos = document.getElementById("label-dock-pos");
+
   const btnSpeed = document.getElementById("btn-speed");
-  const btnSpeedMobile = document.getElementById("btn-speed-mobile");
   const btnMute = document.getElementById("btn-mute");
   const iconVol = document.getElementById("icon-vol");
   const iconMuted = document.getElementById("icon-muted");
   const volumeSlider = document.getElementById("volume-slider");
-  const btnPlayMode = document.getElementById("btn-play-mode");
-  const iconModeSequential = document.getElementById("icon-mode-sequential");
-  const iconModeRepeat = document.getElementById("icon-mode-repeat");
-  const iconModeShuffle = document.getElementById("icon-mode-shuffle");
-  const labelPlayMode = document.getElementById("label-play-mode");
   const btnLayout = document.getElementById("btn-layout");
   const labelLayout = document.getElementById("label-layout");
   const btnSave = document.getElementById("btn-save");
@@ -51,11 +85,9 @@
   const counterEn = document.getElementById("counter-en");
   const counterZh = document.getElementById("counter-zh");
   const counterStack = document.getElementById("counter-stack");
-  const btnFollow = document.getElementById("btn-follow");
-  const btnFollowStack = document.getElementById("btn-follow-stack");
   const toastEl = document.getElementById("toast");
 
-  let appMode = "api"; // 'api' (FastAPI local/tunnel) or 'static' (GitHub Pages)
+  let appMode = "api";
   let episodes = [];
   let currentEpisode = null;
   let subtitles = [];
@@ -69,31 +101,68 @@
   let stackCardEls = [];
   let activeIndex = -1;
   let activeParaIndex = -1;
+  let loopParaIndex = 0;
+
   let speedIdx = 0;
-  let autoFollow = true;
   let isDragging = false;
-  let programmaticScrollUntil = 0;
   let pollTimer = null;
   let toastTimer = null;
   let deferredInstallPrompt = null;
-  let layoutMode = window.innerWidth <= 760 ? "stack" : "split";
   let pendingAutoPlay = false;
+  let geminiClicks = 0;
+  let easterTimer = null;
 
-  const PLAY_MODE_ORDER = ["sequential", "repeat_one", "shuffle"];
-  const PLAY_MODE_META = {
-    sequential: { label: "顺次播放", tip: "当前：顺次播放（播完自动播放下一期）" },
-    repeat_one: { label: "单曲循环", tip: "当前：单曲循环（播完重复播放本期）" },
-    shuffle: { label: "随机播放", tip: "当前：随机播放（播完随机切换下一期）" },
-  };
+  // 双子座图标彩蛋：点击第 10 次出现表情包 1，再点击 10 次（第 20 次）出现表情包 2，之后每 10 次交替出现
+  const EASTER_STICKERS = ["./icons/easter-1.png", "./icons/easter-2.png"];
+
+  function hideEasterEgg() {
+    clearTimeout(easterTimer);
+    easterOverlay.classList.remove("show");
+    easterOverlay.setAttribute("aria-hidden", "true");
+  }
+
+  function showEasterEgg(stickerIdx) {
+    clearTimeout(easterTimer);
+    easterImg.src = EASTER_STICKERS[stickerIdx];
+    easterOverlay.classList.add("show");
+    easterOverlay.setAttribute("aria-hidden", "false");
+    easterTimer = setTimeout(hideEasterEgg, 3600);
+  }
+
+  geminiBadge.addEventListener("click", () => {
+    geminiClicks += 1;
+    if (geminiClicks % 10 === 0) {
+      const stage = (Math.floor(geminiClicks / 10) - 1) % EASTER_STICKERS.length;
+      showEasterEgg(stage);
+    }
+  });
+
+  easterOverlay.addEventListener("click", hideEasterEgg);
+
   const savedPlayMode = localStorage.getItem("cbc_player_play_mode");
   let playMode = PLAY_MODE_ORDER.includes(savedPlayMode) ? savedPlayMode : "sequential";
   const shuffleHistory = new Set();
+
+  // 滚动模式：'sync'（同步滚动，锁定手工滑动）| 'free'（自由滚动，不随音频滚动，可自由滑动与点选）
+  const savedScrollMode = localStorage.getItem("cbc_player_scroll_mode");
+  let scrollMode = savedScrollMode === "free" ? "free" : "sync";
+
+  // 字号：'normal' | 'medium' | 'large'
+  const savedFontSize = localStorage.getItem("cbc_player_font_size");
+  let fontSize = FONT_SIZE_ORDER.includes(savedFontSize) ? savedFontSize : "normal";
+
+  // 按钮位置：'top' | 'bottom'
+  const savedDockPos = localStorage.getItem("cbc_player_dock_pos");
+  let dockPos = savedDockPos === "bottom" ? "bottom" : "top";
+
+  // 视图布局：桌面与手机均可自由切换左右分栏 / 双语交错
+  let layoutMode = localStorage.getItem("cbc_player_layout") || "split";
 
   function showToast(msg) {
     toastEl.textContent = msg;
     toastEl.classList.add("show");
     clearTimeout(toastTimer);
-    toastTimer = setTimeout(() => toastEl.classList.remove("show"), 2800);
+    toastTimer = setTimeout(() => toastEl.classList.remove("show"), 2500);
   }
 
   function formatTime(sec) {
@@ -127,7 +196,7 @@
     return raw.replace(/[^A-Za-z0-9._-]+/g, "_").replace(/^_+|_+$/g, "").slice(0, 90) || "cbc_episode";
   }
 
-  // 注册 Service Worker & Android 安装到桌面引导
+  // 注册 Service Worker & Android 安装引导
   if ("serviceWorker" in navigator) {
     window.addEventListener("load", () => {
       navigator.serviceWorker.register("./sw.js").catch(() => {});
@@ -143,7 +212,7 @@
   window.addEventListener("appinstalled", () => {
     deferredInstallPrompt = null;
     btnInstall.classList.add("hidden");
-    showToast("已安装到手机桌面，下次可直接点击图标全屏打开");
+    showToast("已安装「双子座」到手机桌面");
   });
 
   btnInstall.addEventListener("click", async () => {
@@ -154,19 +223,160 @@
     btnInstall.classList.add("hidden");
   });
 
-  // 布局模式切换（桌面默认左右分栏，手机默认双语交错流）
+  // 1. 滚动模式切换：同步滚动（锁定手工滑动） ↔ 自由滚动（不随音频滚动，可自由滑动与点选）
+  function applyScrollMode(mode, notify = false) {
+    scrollMode = mode === "free" ? "free" : "sync";
+    localStorage.setItem("cbc_player_scroll_mode", scrollMode);
+    const isSync = scrollMode === "sync";
+
+    btnScrollMode.classList.toggle("active-sync", isSync);
+    btnScrollMode.dataset.scrollMode = scrollMode;
+    iconScrollLock.style.display = isSync ? "block" : "none";
+    iconScrollFree.style.display = isSync ? "none" : "block";
+    labelScrollMode.textContent = isSync ? "同步滚动" : "自由滚动";
+    btnScrollMode.title = isSync
+      ? "同步滚动中：字幕随音频自动滚动，手工滑动已锁定；点击切换为自由滚动"
+      : "自由滚动中：字幕不随音频滚动，可自由滑动并点选跳转；点击切换回同步滚动";
+
+    panelSplit.classList.toggle("scroll-locked", isSync);
+    panelStack.classList.toggle("scroll-locked", isSync);
+
+    if (isSync && activeIndex >= 0) {
+      requestAnimationFrame(() => scrollPanelsTo(activeIndex, true));
+    }
+    if (notify) {
+      showToast(isSync ? "已开启：同步滚动（手工滑动已锁定）" : "已切换：自由滚动（可手动滑动并点选跳转）");
+    }
+  }
+  applyScrollMode(scrollMode, false);
+
+  btnScrollMode.addEventListener("click", () => {
+    applyScrollMode(scrollMode === "sync" ? "free" : "sync", true);
+  });
+
+  // 同步滚动开启时严格屏蔽手工滚轮与触摸滑动
+  function blockManualScrollIfSynced(e) {
+    if (scrollMode === "sync") {
+      e.preventDefault();
+    }
+  }
+  [panelSplit, panelStack].forEach((p) => {
+    p.addEventListener("wheel", blockManualScrollIfSynced, { passive: false });
+    p.addEventListener("touchmove", blockManualScrollIfSynced, { passive: false });
+  });
+
+  // 2. 字号三档调节（正常 / 中 / 大）
+  function applyFontSize(size, notify = false) {
+    fontSize = FONT_SIZE_ORDER.includes(size) ? size : "normal";
+    localStorage.setItem("cbc_player_font_size", fontSize);
+    document.documentElement.setAttribute("data-font-size", fontSize);
+    labelFontSize.textContent = FONT_SIZE_LABELS[fontSize];
+    btnFontSize.dataset.fontSize = fontSize;
+    if (scrollMode === "sync" && activeIndex >= 0) {
+      requestAnimationFrame(() => scrollPanelsTo(activeIndex, false));
+    }
+    if (notify) showToast(`字幕${FONT_SIZE_LABELS[fontSize]}`);
+  }
+  applyFontSize(fontSize, false);
+
+  btnFontSize.addEventListener("click", () => {
+    const nextIdx = (FONT_SIZE_ORDER.indexOf(fontSize) + 1) % FONT_SIZE_ORDER.length;
+    applyFontSize(FONT_SIZE_ORDER[nextIdx], true);
+  });
+
+  // 3. 底部按钮 / 顶部按钮整体位置切换（节目标题栏始终固定在最上方）
+  function applyDockPos(pos, notify = false) {
+    dockPos = pos === "bottom" ? "bottom" : "top";
+    localStorage.setItem("cbc_player_dock_pos", dockPos);
+    const isBottom = dockPos === "bottom";
+    appShell.classList.toggle("controls-bottom", isBottom);
+    labelDockPos.textContent = isBottom ? "按钮顶部" : "按钮底部";
+    btnDockPos.dataset.dock = dockPos;
+    btnDockPos.title = isBottom ? "点击将操作按钮移回屏幕上方" : "点击将操作按钮整体移至屏幕下方";
+    if (scrollMode === "sync" && activeIndex >= 0) {
+      requestAnimationFrame(() => scrollPanelsTo(activeIndex, false));
+    }
+    if (notify) showToast(isBottom ? "操作按钮已移至屏幕下方" : "操作按钮已切换回屏幕上方");
+  }
+  applyDockPos(dockPos, false);
+
+  btnDockPos.addEventListener("click", () => {
+    applyDockPos(dockPos === "top" ? "bottom" : "top", true);
+  });
+
+  // 4. 播放模式四态切换（顺次播放 / 本段循环 / 单曲循环 / 随机播放）
+  function applyPlayMode(mode, notify = false) {
+    playMode = PLAY_MODE_ORDER.includes(mode) ? mode : "sequential";
+    localStorage.setItem("cbc_player_play_mode", playMode);
+    if (playMode === "loop_para") {
+      loopParaIndex = activeParaIndex >= 0 ? activeParaIndex : 0;
+    }
+    const meta = PLAY_MODE_META[playMode];
+    labelPlayMode.textContent = meta.label;
+    btnPlayMode.title = `${meta.tip}，点击切换`;
+    btnPlayMode.dataset.mode = playMode;
+
+    iconModeSequential.style.display = playMode === "sequential" ? "block" : "none";
+    iconModeLoopPara.style.display = playMode === "loop_para" ? "block" : "none";
+    iconModeRepeat.style.display = playMode === "repeat_one" ? "block" : "none";
+    iconModeShuffle.style.display = playMode === "shuffle" ? "block" : "none";
+
+    if (notify) {
+      const extra = (playMode === "loop_para" && paragraphs.length > 0) ? `（第 ${loopParaIndex + 1} 段）` : "";
+      showToast(`已切换为：${meta.label}${extra}`);
+    }
+  }
+  applyPlayMode(playMode, false);
+
+  btnPlayMode.addEventListener("click", () => {
+    const nextIdx = (PLAY_MODE_ORDER.indexOf(playMode) + 1) % PLAY_MODE_ORDER.length;
+    applyPlayMode(PLAY_MODE_ORDER[nextIdx], true);
+  });
+
+  // 5. 前一段 / 后一段跳转
+  function jumpToParagraph(delta) {
+    if (!paragraphs.length) {
+      // 无字幕段落时回退为 ±10 秒跳转
+      seekTo((audio.currentTime || 0) + delta * 10);
+      return;
+    }
+    const basePara = activeParaIndex >= 0 ? activeParaIndex : 0;
+    const targetPara = Math.max(0, Math.min(paragraphs.length - 1, basePara + delta));
+    loopParaIndex = targetPara;
+    const para = paragraphs[targetPara];
+    seekTo(para.start + 0.04, true);
+    showToast(`已跳转至第 ${targetPara + 1} / ${paragraphs.length} 段`);
+  }
+
+  btnPrevPara.addEventListener("click", () => jumpToParagraph(-1));
+  btnNextPara.addEventListener("click", () => jumpToParagraph(1));
+
+  // 本段循环精准检测（防止播过当前段尾）
+  function checkParagraphLoop() {
+    if (playMode !== "loop_para" || audio.paused || !paragraphs.length) return;
+    const idx = Math.max(0, Math.min(paragraphs.length - 1, loopParaIndex));
+    const para = paragraphs[idx];
+    if (!para) return;
+    if ((audio.currentTime || 0) >= para.end - 0.06) {
+      audio.currentTime = Math.max(0, para.start + 0.02);
+      updateProgressUI();
+      syncSubtitleHighlight(true);
+    }
+  }
+  setInterval(checkParagraphLoop, 150);
+
+  // 布局模式切换（左右分栏 / 双语交错）
   function applyLayout(mode, savePref = false) {
     layoutMode = mode === "stack" ? "stack" : "split";
     subtitlesMain.classList.toggle("mode-stack", layoutMode === "stack");
     subtitlesMain.classList.toggle("mode-split", layoutMode === "split");
     labelLayout.textContent = layoutMode === "stack" ? "双语交错" : "左右分栏";
     if (savePref) localStorage.setItem("cbc_player_layout", layoutMode);
-    if (activeIndex >= 0 && autoFollow) {
+    if (scrollMode === "sync" && activeIndex >= 0) {
       requestAnimationFrame(() => scrollPanelsTo(activeIndex, false));
     }
   }
-  const savedLayout = localStorage.getItem("cbc_player_layout");
-  applyLayout(savedLayout || (window.innerWidth <= 760 ? "stack" : "split"), false);
+  applyLayout(layoutMode, false);
   btnLayout.addEventListener("click", () => {
     applyLayout(layoutMode === "stack" ? "split" : "stack", true);
   });
@@ -177,7 +387,7 @@
     themeIcon.textContent = theme === "dark" ? "☀️" : "🌙";
     localStorage.setItem("cbc_player_theme", theme);
     const metaTheme = document.querySelector('meta[name="theme-color"]');
-    if (metaTheme) metaTheme.setAttribute("content", theme === "dark" ? "#131a24" : "#c8102e");
+    if (metaTheme) metaTheme.setAttribute("content", theme === "dark" ? "#131a24" : "#d92626");
   }
   const savedTheme = localStorage.getItem("cbc_player_theme") ||
     (window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light");
@@ -187,7 +397,7 @@
     applyTheme(next);
   });
 
-  // Android 锁屏 / 蓝牙耳机 / 通知栏媒体控制（Media Session API）
+  // Android 锁屏 / 蓝牙耳机媒体控制（Media Session API）
   function updateMediaSessionMetadata() {
     if (!("mediaSession" in navigator) || !currentEpisode) return;
     try {
@@ -196,9 +406,7 @@
         title: currentEpisode.display_title || currentEpisode.title || "The World This Hour",
         artist: `CBC Radio · ${currentEpisode.feed_name || "News"}`,
         album: "双子座 · CBC 双语字幕播放器",
-        artwork: [
-          { src: iconUrl, sizes: "512x512", type: "image/png" },
-        ],
+        artwork: [{ src: iconUrl, sizes: "512x512", type: "image/png" }],
       });
     } catch (_) {}
   }
@@ -220,35 +428,15 @@
     try {
       navigator.mediaSession.setActionHandler("play", () => audio.play().catch(() => {}));
       navigator.mediaSession.setActionHandler("pause", () => audio.pause());
-      navigator.mediaSession.setActionHandler("seekbackward", (d) => seekTo((audio.currentTime || 0) - (d.seekOffset || 5)));
-      navigator.mediaSession.setActionHandler("seekforward", (d) => seekTo((audio.currentTime || 0) + (d.seekOffset || 5)));
+      navigator.mediaSession.setActionHandler("seekbackward", () => jumpToParagraph(-1));
+      navigator.mediaSession.setActionHandler("seekforward", () => jumpToParagraph(1));
       navigator.mediaSession.setActionHandler("seekto", (d) => {
-        if (typeof d.seekTime === "number") seekTo(d.seekTime);
+        if (typeof d.seekTime === "number") seekTo(d.seekTime, true);
       });
       navigator.mediaSession.setActionHandler("nexttrack", () => advanceEpisode(1, true));
       navigator.mediaSession.setActionHandler("previoustrack", () => advanceEpisode(-1, true));
     } catch (_) {}
   }
-
-  // 播放模式切换（顺次播放 / 单曲循环 / 随机播放）
-  function applyPlayMode(mode, notify = false) {
-    playMode = PLAY_MODE_ORDER.includes(mode) ? mode : "sequential";
-    localStorage.setItem("cbc_player_play_mode", playMode);
-    const meta = PLAY_MODE_META[playMode];
-    labelPlayMode.textContent = meta.label;
-    btnPlayMode.title = `${meta.tip}，点击切换`;
-    btnPlayMode.dataset.mode = playMode;
-    iconModeSequential.style.display = playMode === "sequential" ? "block" : "none";
-    iconModeRepeat.style.display = playMode === "repeat_one" ? "block" : "none";
-    iconModeShuffle.style.display = playMode === "shuffle" ? "block" : "none";
-    if (notify) showToast(`已切换为：${meta.label}`);
-  }
-  applyPlayMode(playMode, false);
-
-  btnPlayMode.addEventListener("click", () => {
-    const nextIdx = (PLAY_MODE_ORDER.indexOf(playMode) + 1) % PLAY_MODE_ORDER.length;
-    applyPlayMode(PLAY_MODE_ORDER[nextIdx], true);
-  });
 
   function pickNextEpisodeIndex(direction = 1) {
     if (!episodes.length) return -1;
@@ -275,9 +463,14 @@
 
   function advanceEpisode(direction = 1, fromManual = false) {
     if (!episodes.length) return;
+    if (!fromManual && playMode === "loop_para" && paragraphs.length > 0) {
+      const idx = Math.max(0, Math.min(paragraphs.length - 1, loopParaIndex));
+      audio.currentTime = Math.max(0, paragraphs[idx].start + 0.02);
+      syncSubtitleHighlight(true);
+      audio.play().catch(() => {});
+      return;
+    }
     if (!fromManual && playMode === "repeat_one") {
-      autoFollow = true;
-      setFollowVisible(false);
       audio.currentTime = 0;
       syncSubtitleHighlight(true);
       audio.play().catch(() => {});
@@ -291,16 +484,7 @@
     selectEpisode(targetEp.id, true);
   }
 
-  // 纯前端 SRT / TXT / 无压缩 ZIP 生成器（用于 GitHub Pages 静态模式下也能本地保存全部文件）
-  function buildSrtText(list, mode) {
-    return list.map((item, i) => {
-      const en = (item.en || "").trim();
-      const zh = (item.zh || "").trim();
-      const body = mode === "en" ? en : (mode === "zh" ? (zh || en) : (zh ? `${en}\n${zh}` : en));
-      return `${i + 1}\n${formatSrtTs(item.start)} --> ${formatSrtTs(item.end)}\n${body}\n`;
-    }).join("\n");
-  }
-
+  // 字幕分段工具与本地保存导出
   function groupSubtitlesByParagraph(list) {
     const groups = [];
     list.forEach((item, idx) => {
@@ -314,6 +498,15 @@
       }
     });
     return groups;
+  }
+
+  function buildSrtText(list, mode) {
+    return list.map((item, i) => {
+      const en = (item.en || "").trim();
+      const zh = (item.zh || "").trim();
+      const body = mode === "en" ? en : (mode === "zh" ? (zh || en) : (zh ? `${en}\n${zh}` : en));
+      return `${i + 1}\n${formatSrtTs(item.start)} --> ${formatSrtTs(item.end)}\n${body}\n`;
+    }).join("\n");
   }
 
   function buildBilingualTxt(ep, list) {
@@ -356,7 +549,6 @@
     const localParts = [];
     const centralParts = [];
     let offset = 0;
-
     for (const f of files) {
       const nameBytes = enc.encode(f.name);
       const data = f.data;
@@ -366,7 +558,6 @@
       lv.setUint32(0, 0x04034b50, true);
       lv.setUint16(4, 20, true);
       lv.setUint16(6, 0x0800, true);
-      lv.setUint16(8, 0, true); // store (no compression)
       lv.setUint32(14, crc, true);
       lv.setUint32(18, data.length, true);
       lv.setUint32(22, data.length, true);
@@ -380,7 +571,6 @@
       cv.setUint16(4, 20, true);
       cv.setUint16(6, 20, true);
       cv.setUint16(8, 0x0800, true);
-      cv.setUint16(10, 0, true);
       cv.setUint32(16, crc, true);
       cv.setUint32(20, data.length, true);
       cv.setUint32(24, data.length, true);
@@ -388,10 +578,8 @@
       cv.setUint32(42, offset, true);
       centralHdr.set(nameBytes, 46);
       centralParts.push(centralHdr);
-
       offset += localHdr.length + data.length;
     }
-
     const centralSize = centralParts.reduce((s, p) => s + p.length, 0);
     const eocd = new Uint8Array(22);
     const ev = new DataView(eocd.buffer);
@@ -400,7 +588,6 @@
     ev.setUint16(10, files.length, true);
     ev.setUint32(12, centralSize, true);
     ev.setUint32(16, offset, true);
-
     return new Blob([...localParts, ...centralParts, eocd], { type: "application/zip" });
   }
 
@@ -416,9 +603,7 @@
   }
 
   function episodeAudioUrl(ep) {
-    if (appMode === "api") {
-      return `/api/episodes/${encodeURIComponent(ep.id)}/audio`;
-    }
+    if (appMode === "api") return `/api/episodes/${encodeURIComponent(ep.id)}/audio`;
     if (ep.static_audio_path) return `./${ep.static_audio_path}`;
     return ep.remote_audio_url;
   }
@@ -456,24 +641,19 @@
         showToast("正在准备音频文件下载...");
         const resp = await fetch(audioUrl);
         if (!resp.ok) throw new Error("audio fetch failed");
-        const blob = await resp.blob();
-        triggerBlobDownload(blob, `${slug}.mp3`);
-        showToast("已保存音频到下载目录");
+        triggerBlobDownload(await resp.blob(), `${slug}.mp3`);
+        showToast("已保存音频到本地");
       } catch (_) {
         window.open(audioUrl, "_blank", "noopener");
       }
       return;
     }
 
-    // ZIP 打包：音频 + 4 份字幕
     showToast("正在打包音频与中英字幕...");
     const files = [];
     try {
       const resp = await fetch(audioUrl);
-      if (resp.ok) {
-        const buf = new Uint8Array(await resp.arrayBuffer());
-        files.push({ name: `${slug}.mp3`, data: buf });
-      }
+      if (resp.ok) files.push({ name: `${slug}.mp3`, data: new Uint8Array(await resp.arrayBuffer()) });
     } catch (_) {}
 
     if (subtitles.length > 0) {
@@ -490,14 +670,14 @@
     showToast("已开始保存 ZIP 打包文件");
   }
 
-  // 渲染期数下拉菜单
   function renderEpisodeSelect(selectedId) {
     episodeSelect.innerHTML = "";
     if (!episodes.length) {
       const opt = document.createElement("option");
       opt.value = "";
-      opt.textContent = "暂无音频，请点击「同步最新」";
+      opt.textContent = "暂无音频，请点击「同步」";
       episodeSelect.appendChild(opt);
+      episodeIndexBadge.textContent = "0/0";
       return;
     }
 
@@ -524,6 +704,9 @@
       });
       episodeSelect.appendChild(og);
     }
+
+    const curIdx = episodes.findIndex((e) => e.id === selectedId);
+    episodeIndexBadge.textContent = `${curIdx >= 0 ? curIdx + 1 : 1}/${episodes.length}`;
   }
 
   function updateDownloadMenuState() {
@@ -541,7 +724,7 @@
   function renderStatusPlaceholder(ep) {
     const pct = Math.max(4, Math.min(100, ep?.progress || 6));
     const msg = appMode === "static"
-      ? (ep?.has_subtitles ? "正在加载中英双语字幕..." : "该期暂未预生成双语字幕，可切换带 ✓ 标记的期数或直接收听音频")
+      ? (ep?.has_subtitles ? "正在加载中英双语字幕..." : "该期暂未预生成双语字幕")
       : (ep?.status_message || "正在准备中英双语字幕...");
     const isErr = ep?.status === "error";
 
@@ -574,11 +757,6 @@
     }
   }
 
-  function setFollowVisible(show) {
-    btnFollow.classList.toggle("visible", show);
-    btnFollowStack.classList.toggle("visible", show);
-  }
-
   function renderSubtitles() {
     panelSplit.innerHTML = "";
     panelStack.innerHTML = "";
@@ -592,6 +770,7 @@
     stackCardEls = [];
     activeIndex = -1;
     activeParaIndex = -1;
+    loopParaIndex = 0;
 
     if (!subtitles.length) {
       renderStatusPlaceholder(currentEpisode);
@@ -606,7 +785,6 @@
     paragraphs.forEach((para, pIdx) => {
       const metaText = `第 ${pIdx + 1} 段 · ${formatTime(para.start)} - ${formatTime(para.end)}`;
 
-      // 1. 锁定对齐的左右分栏网格行（左英 + 右中在同一网格行，顶边/高度永久对齐并同步滚动）
       const pairRow = document.createElement("div");
       pairRow.className = "para-pair-row";
       pairRow.dataset.paraIndex = String(pIdx);
@@ -627,7 +805,6 @@
       const zhProse = document.createElement("p");
       zhProse.className = "para-prose";
 
-      // 2. 手机竖屏双语交错段落卡片
       const stackCard = document.createElement("article");
       stackCard.className = "para-card stack-para-card";
       stackCard.dataset.paraIndex = String(pIdx);
@@ -635,18 +812,17 @@
       stackMeta.className = "para-meta";
       stackMeta.textContent = metaText;
       const stackEnProse = document.createElement("p");
-      stackEnProse.className = "para-prose stack-en";
+      stackEnProse.className = "para-prose";
       const stackDiv = document.createElement("div");
       stackDiv.className = "stack-divider";
       const stackZhProse = document.createElement("p");
-      stackZhProse.className = "para-prose stack-zh";
+      stackZhProse.className = "para-prose";
 
       para.items.forEach(({ idx, item }, localIdx) => {
         sentenceToPara[idx] = pIdx;
         const onSentClick = () => {
-          autoFollow = true;
-          setFollowVisible(false);
-          seekTo(item.start + 0.05);
+          loopParaIndex = pIdx;
+          seekTo(item.start + 0.05, true);
           if (audio.paused) audio.play().catch(() => {});
         };
 
@@ -735,13 +911,11 @@
   }
 
   function scrollPanelsTo(idx, smooth = true) {
-    programmaticScrollUntil = performance.now() + 500;
     if (layoutMode === "stack") {
       const targetEl = stackEnSpans[idx] || stackCardEls[sentenceToPara[idx]];
       scrollContainerToElement(panelStack, targetEl, smooth);
       return;
     }
-    // 统一滚动容器：只需滚动 #panel-split，左英右中永远 100% 锁定同步！
     const targetEl = splitEnSpans[idx] || splitRowEls[sentenceToPara[idx]];
     scrollContainerToElement(panelSplit, targetEl, smooth);
   }
@@ -792,7 +966,10 @@
       counterZh.textContent = text;
       counterStack.textContent = text;
 
-      if (autoFollow) scrollPanelsTo(activeIndex, !forceScroll);
+      // 仅在「同步滚动」模式下字幕自动随音频滚动；「自由滚动」下不强行拉动滚动条
+      if (scrollMode === "sync") {
+        scrollPanelsTo(activeIndex, !forceScroll);
+      }
     }
   }
 
@@ -823,12 +1000,15 @@
     }
   }
 
-  function seekTo(sec) {
+  function seekTo(sec, updateLoopTarget = false) {
     const dur = effectiveDuration();
     const target = Math.max(0, dur > 0 ? Math.min(dur - 0.05, sec) : Math.max(0, sec));
     audio.currentTime = target;
     updateProgressUI();
     syncSubtitleHighlight(false);
+    if (updateLoopTarget && activeParaIndex >= 0) {
+      loopParaIndex = activeParaIndex;
+    }
     updateMediaSessionPosition();
   }
 
@@ -849,7 +1029,6 @@
         if (!res.ok) return;
         const data = await res.json();
         currentEpisode = data.episode;
-
         const listIdx = episodes.findIndex((e) => e.id === epId);
         if (listIdx >= 0) episodes[listIdx] = currentEpisode;
 
@@ -857,10 +1036,9 @@
           subtitles = data.subtitles;
           renderEpisodeSelect(epId);
           renderSubtitles();
-          showToast(`双语字幕已就绪（共 ${subtitles.length} 句）`);
+          showToast(`双语字幕已就绪（共 ${paragraphs.length} 段）`);
           return;
         }
-
         renderStatusPlaceholder(currentEpisode);
         if (["queued", "downloading", "transcribing", "translating"].includes(currentEpisode.status)) {
           pollTimer = setTimeout(poll, 1600);
@@ -875,8 +1053,6 @@
   async function selectEpisode(epId, autoPlay = false) {
     if (!epId) return;
     stopPolling();
-    autoFollow = true;
-    setFollowVisible(false);
 
     try {
       if (appMode === "api") {
@@ -919,9 +1095,7 @@
 
       pendingAutoPlay = Boolean(autoPlay);
       if (autoPlay) {
-        audio.play().then(() => {
-          pendingAutoPlay = false;
-        }).catch(() => {});
+        audio.play().then(() => { pendingAutoPlay = false; }).catch(() => {});
       }
     } catch (err) {
       showToast(`加载失败: ${err.message}`);
@@ -929,7 +1103,6 @@
   }
 
   async function detectModeAndLoad(preserveSelection = false) {
-    // 优先检测 FastAPI 动态模式，失败则自动切为 GitHub Pages 静态模式
     try {
       const res = await fetch("/api/episodes", { cache: "no-store" });
       if (res.ok) {
@@ -945,7 +1118,6 @@
       }
     } catch (_) {}
 
-    // Static mode (GitHub Pages)
     appMode = "static";
     const sRes = await fetch(`./data/episodes.json?t=${Date.now()}`, { cache: "no-store" });
     if (!sRes.ok) throw new Error("无法加载节目归档清单");
@@ -968,7 +1140,7 @@
     }
   }
 
-  // 事件绑定
+  // 基础控件事件绑定
   episodeSelect.addEventListener("change", () => {
     const epId = episodeSelect.value;
     if (epId) selectEpisode(epId, false);
@@ -983,20 +1155,13 @@
     }
   });
 
-  btnRew.addEventListener("click", () => seekTo((audio.currentTime || 0) - 5));
-  btnFwd.addEventListener("click", () => seekTo((audio.currentTime || 0) + 5));
-
-  function cycleSpeed() {
+  btnSpeed.addEventListener("click", () => {
     speedIdx = (speedIdx + 1) % SPEEDS.length;
     const rate = SPEEDS[speedIdx];
     audio.playbackRate = rate;
-    const label = `${rate.toFixed(2).replace(/\.00$/, ".0")}x`;
-    btnSpeed.textContent = label;
-    btnSpeedMobile.textContent = label;
+    btnSpeed.textContent = `${rate.toFixed(2).replace(/\.00$/, ".0")}x`;
     updateMediaSessionPosition();
-  }
-  btnSpeed.addEventListener("click", cycleSpeed);
-  btnSpeedMobile.addEventListener("click", cycleSpeed);
+  });
 
   btnMute.addEventListener("click", () => {
     audio.muted = !audio.muted;
@@ -1012,7 +1177,6 @@
     iconMuted.style.display = audio.muted ? "block" : "none";
   });
 
-  // 保存按钮与菜单
   btnSave.addEventListener("click", (e) => {
     e.stopPropagation();
     updateDownloadMenuState();
@@ -1030,7 +1194,6 @@
       if (!currentEpisode) return;
       const kind = btn.dataset.download;
       saveDropdown.classList.remove("open");
-
       if (appMode === "static") {
         handleStaticDownload(kind);
         return;
@@ -1046,7 +1209,6 @@
     });
   });
 
-  // 手动同步最新 CBC 音频
   btnSync.addEventListener("click", async () => {
     btnSync.disabled = true;
     iconSync.classList.add("spin");
@@ -1082,7 +1244,7 @@
     } finally {
       btnSync.disabled = false;
       iconSync.classList.remove("spin");
-      labelSync.textContent = "同步最新";
+      labelSync.textContent = "同步";
     }
   });
 
@@ -1098,7 +1260,7 @@
     isDragging = true;
     progressHit.classList.add("dragging");
     progressHit.setPointerCapture(e.pointerId);
-    seekTo(timeFromClientX(e.clientX));
+    seekTo(timeFromClientX(e.clientX), true);
   });
 
   progressHit.addEventListener("pointermove", (e) => {
@@ -1107,7 +1269,7 @@
     const t = timeFromClientX(e.clientX);
     hoverPreview.textContent = `预览 ${formatTime(t)}`;
     hoverPreview.classList.add("visible");
-    if (isDragging) seekTo(t);
+    if (isDragging) seekTo(t, true);
   });
 
   progressHit.addEventListener("pointerup", (e) => {
@@ -1121,28 +1283,7 @@
     if (!isDragging) hoverPreview.classList.remove("visible");
   });
 
-  // 手动滚动字幕时暂离自动跟踪
-  function onUserManualScroll() {
-    if (performance.now() < programmaticScrollUntil) return;
-    if (autoFollow && subtitles.length > 0) {
-      autoFollow = false;
-      setFollowVisible(true);
-    }
-  }
-  [panelSplit, panelStack].forEach((p) => {
-    p.addEventListener("wheel", onUserManualScroll, { passive: true });
-    p.addEventListener("touchmove", onUserManualScroll, { passive: true });
-  });
-
-  function resumeFollow() {
-    autoFollow = true;
-    setFollowVisible(false);
-    if (activeIndex >= 0) scrollPanelsTo(activeIndex, true);
-  }
-  btnFollow.addEventListener("click", resumeFollow);
-  btnFollowStack.addEventListener("click", resumeFollow);
-
-  // 音频原生事件
+  // 音频事件
   audio.addEventListener("play", () => {
     updatePlayButton();
     updateMediaSessionPosition();
@@ -1170,10 +1311,11 @@
   audio.addEventListener("progress", updateProgressUI);
   audio.addEventListener("timeupdate", () => {
     if (!isDragging) updateProgressUI();
+    checkParagraphLoop();
     syncSubtitleHighlight(false);
   });
 
-  // 键盘快捷键
+  // 全局键盘快捷键
   window.addEventListener("keydown", (e) => {
     const tag = (e.target?.tagName || "").toLowerCase();
     if (tag === "input" || tag === "textarea" || tag === "select") return;
@@ -1182,14 +1324,13 @@
       btnPlay.click();
     } else if (e.code === "ArrowLeft") {
       e.preventDefault();
-      seekTo((audio.currentTime || 0) - 5);
+      jumpToParagraph(-1);
     } else if (e.code === "ArrowRight") {
       e.preventDefault();
-      seekTo((audio.currentTime || 0) + 5);
+      jumpToParagraph(1);
     }
   });
 
-  // 启动加载
   async function boot() {
     for (let attempt = 0; attempt < 6; attempt++) {
       try {

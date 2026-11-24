@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="zh-CN">
+<html lang="zh-CN" data-font-size="normal">
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
@@ -15,223 +15,251 @@
   <link rel="stylesheet" href="./styles.css" />
 </head>
 <body>
-  <div class="app-shell">
+  <div id="app-shell" class="app-shell">
 
-    <!-- 1. 顶部：播放控制栏（桌面单行；手机端自动拆分：期数与工具置顶，大拇指播放栏吸底） -->
-    <header class="control-bar" aria-label="播放控制栏">
-      <!-- 左侧：品牌标识 + 多期音频选择 -->
-      <div class="brand-picker">
-        <span class="cbc-badge" title="双子座 · 自动同步 CBC 官方 RSS">
-          <span class="live-dot"></span>
-          双子座
+    <!-- 1. 固定节目标题栏（始终保持在屏幕最上方不动） -->
+    <header class="title-header" aria-label="节目标题栏">
+      <div class="brand-title">
+        <span id="gemini-badge" class="gemini-badge" title="双子座 · 自动同步 CBC 官方最新新闻">
+          <svg class="gemini-icon" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <path d="M5 4c4.5 2 9.5 2 14 0"/>
+            <path d="M5 20c4.5-2 9.5-2 14 0"/>
+            <line x1="9" y1="5.5" x2="9" y2="18.5"/>
+            <line x1="15" y1="5.5" x2="15" y2="18.5"/>
+          </svg>
+          <span>双子座</span>
         </span>
         <div class="episode-select-wrap">
           <select id="episode-select" class="episode-select" aria-label="选择要播放的 CBC 音频期数">
-            <option value="">正在加载 CBC 最新期数...</option>
+            <option value="">正在加载节目列表...</option>
           </select>
         </div>
-      </div>
-
-      <!-- 中间：核心播放控制按钮（手机端自动下移至底部大拇指区） -->
-      <div class="playback-controls">
-        <button id="btn-rew" class="btn btn-seek" type="button" title="快退 5 秒 (←)">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-            <path d="M3 12a9 9 0 1 0 3-6.7L3 8"/><path d="M3 3v5h5"/>
-          </svg>
-          -5s
-        </button>
-
-        <button id="btn-play" class="btn btn-primary" type="button" title="播放 / 暂停 (Space)">
-          <svg id="icon-play" width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
-            <polygon points="6 3 20 12 6 21 6 3"/>
-          </svg>
-          <svg id="icon-pause" width="16" height="16" viewBox="0 0 24 24" fill="currentColor" style="display:none">
-            <rect x="6" y="4" width="4" height="16" rx="1"/><rect x="14" y="4" width="4" height="16" rx="1"/>
-          </svg>
-          <span id="label-play">播放</span>
-        </button>
-
-        <button id="btn-fwd" class="btn btn-seek" type="button" title="快进 5 秒 (→)">
-          +5s
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-            <path d="M21 12a9 9 0 1 1-3-6.7L21 8"/><path d="M21 3v5h-5"/>
-          </svg>
-        </button>
-
-        <button id="btn-speed-mobile" class="btn btn-mono mobile-only" type="button" title="切换播放倍速">1.0x</button>
-      </div>
-
-      <!-- 右侧：倍速、音量、保存、视图切换、安装App、同步、主题 -->
-      <div class="right-tools">
-        <button id="btn-speed" class="btn btn-mono desktop-only" type="button" title="切换播放倍速">1.0x</button>
-
-        <div class="volume-group desktop-only">
-          <button id="btn-mute" class="btn btn-icon" type="button" title="静音 / 取消静音">
-            <svg id="icon-vol" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-              <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/>
-              <path d="M15.54 8.46a5 5 0 0 1 0 7.07"/>
-              <path d="M19.07 4.93a10 10 0 0 1 0 14.14"/>
-            </svg>
-            <svg id="icon-muted" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:none">
-              <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/>
-              <line x1="23" y1="9" x2="17" y2="15"/><line x1="17" y1="9" x2="23" y2="15"/>
-            </svg>
-          </button>
-          <input id="volume-slider" class="volume-slider" type="range" min="0" max="1" step="0.05" value="1" aria-label="音量" />
-        </div>
-
-        <button id="btn-play-mode" class="btn btn-play-mode" type="button" title="播放模式：顺次播放（点击切换：顺次播放 / 单曲循环 / 随机播放）" aria-label="切换播放模式">
-          <svg id="icon-mode-sequential" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-            <polyline points="17 1 21 5 17 9"/>
-            <path d="M3 11V9a4 4 0 0 1 4-4h14"/>
-            <polyline points="7 23 3 19 7 15"/>
-            <path d="M21 13v2a4 4 0 0 1-4 4H3"/>
-          </svg>
-          <svg id="icon-mode-repeat" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:none">
-            <polyline points="17 1 21 5 17 9"/>
-            <path d="M3 11V9a4 4 0 0 1 4-4h14"/>
-            <polyline points="7 23 3 19 7 15"/>
-            <path d="M21 13v2a4 4 0 0 1-4 4H3"/>
-            <path d="M11 10h1v4"/>
-          </svg>
-          <svg id="icon-mode-shuffle" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:none">
-            <polyline points="16 3 21 3 21 8"/>
-            <line x1="4" y1="20" x2="21" y2="3"/>
-            <polyline points="21 16 21 21 16 21"/>
-            <line x1="15" y1="15" x2="21" y2="21"/>
-            <line x1="4" y1="4" x2="9" y2="9"/>
-          </svg>
-          <span id="label-play-mode">顺次播放</span>
-        </button>
-
-        <button id="btn-layout" class="btn" type="button" title="切换左右分栏 / 上下双语交错视图">
-          <span id="label-layout">分栏</span>
-        </button>
-
-        <!-- 保存到本地硬盘 / 手机下载目录 -->
-        <div class="save-menu-wrap">
-          <button id="btn-save" class="btn" type="button" title="将当前音频和字幕保存到本地">
-            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-              <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
-              <polyline points="7 10 12 15 17 10"/>
-              <line x1="12" y1="15" x2="12" y2="3"/>
-            </svg>
-            <span class="btn-text-sm">保存</span>
-          </button>
-          <div id="save-dropdown" class="save-dropdown" role="menu">
-            <div class="save-dropdown-title">保存当前期数到本地</div>
-            <button class="save-item save-item-featured" data-download="zip" type="button">
-              <span>打包下载（音频 + 全部字幕）</span>
-              <span class="save-ext">.zip</span>
-            </button>
-            <div class="save-divider"></div>
-            <button class="save-item" data-download="audio" type="button">
-              <span>仅保存音频文件</span>
-              <span class="save-ext">.mp3</span>
-            </button>
-            <button class="save-item" data-download="srt_en" type="button">
-              <span>保存英文字幕</span>
-              <span class="save-ext">.srt</span>
-            </button>
-            <button class="save-item" data-download="srt_zh" type="button">
-              <span>保存中文字幕</span>
-              <span class="save-ext">.srt</span>
-            </button>
-            <button class="save-item" data-download="srt_bilingual" type="button">
-              <span>保存双语对照字幕</span>
-              <span class="save-ext">.srt</span>
-            </button>
-            <button class="save-item" data-download="txt" type="button">
-              <span>保存双语对照文稿</span>
-              <span class="save-ext">.txt</span>
-            </button>
-          </div>
-        </div>
-
-        <button id="btn-sync" class="btn" type="button" title="检查并同步 CBC 最新音频">
-          <svg id="icon-sync" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-            <path d="M21 12a9 9 0 0 0-9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/>
-            <path d="M3 3v5h5"/>
-            <path d="M3 12a9 9 0 0 0 9 9 9.75 9.75 0 0 0 6.74-2.74L21 16"/>
-            <path d="M16 16h5v5"/>
-          </svg>
-          <span id="label-sync" class="btn-text-sm">同步最新</span>
-        </button>
-
-        <button id="btn-install" class="btn btn-install hidden" type="button" title="安装到手机桌面，像 App 一样全屏打开">
-          📲 安装App
-        </button>
-
-        <button id="btn-theme" class="btn btn-icon" type="button" title="切换浅色 / 深色主题">
-          <span id="theme-icon">🌙</span>
-        </button>
+        <span id="episode-index-badge" class="episode-index-badge">0/0</span>
       </div>
     </header>
 
-    <!-- 2. 中部：超长全宽播放进度条 -->
-    <section class="progress-bar-section" aria-label="播放进度控制条">
-      <div class="progress-meta">
-        <div class="progress-meta-left">
-          <span id="time-current" class="time-code">00:00</span>
-          <span id="episode-meta-hint" class="episode-meta-hint">准备就绪 · 支持 Space 播放/暂停，← / → 快退快进 5 秒</span>
+    <!-- 2. 可整体切换位置的控制面板（点击「按钮底部 / 按钮顶部」可在屏幕上方与下方自由切换） -->
+    <section id="controls-dock" class="controls-dock" aria-label="播放操作与进度控制区">
+      <!-- 操作按钮组 -->
+      <div class="controls-panel">
+        <!-- 主播控行：前一段 / 播放 / 后一段 / 播放模式（含本段循环） -->
+        <div class="primary-controls-row">
+          <button id="btn-prev-para" class="btn btn-para-nav" type="button" title="跳转到前一段 (←)">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+              <polygon points="19 20 9 12 19 4 19 20"/><line x1="5" y1="19" x2="5" y2="5"/>
+            </svg>
+            <span>前一段</span>
+          </button>
+
+          <button id="btn-play" class="btn btn-primary" type="button" title="播放 / 暂停 (Space)">
+            <svg id="icon-play" width="17" height="17" viewBox="0 0 24 24" fill="currentColor">
+              <polygon points="6 3 20 12 6 21 6 3"/>
+            </svg>
+            <svg id="icon-pause" width="17" height="17" viewBox="0 0 24 24" fill="currentColor" style="display:none">
+              <rect x="6" y="4" width="4" height="16" rx="1"/><rect x="14" y="4" width="4" height="16" rx="1"/>
+            </svg>
+            <span id="label-play">播放</span>
+          </button>
+
+          <button id="btn-next-para" class="btn btn-para-nav" type="button" title="跳转到后一段 (→)">
+            <span>后一段</span>
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+              <polygon points="5 4 15 12 5 20 5 4"/><line x1="19" y1="5" x2="19" y2="19"/>
+            </svg>
+          </button>
+
+          <!-- 播放模式四态切换：顺次播放 / 本段循环 / 单曲循环 / 随机播放 -->
+          <button id="btn-play-mode" class="btn btn-play-mode" type="button" title="切换播放模式：顺次播放 / 本段循环 / 单曲循环 / 随机播放" aria-label="切换播放模式">
+            <svg id="icon-mode-sequential" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <polyline points="17 1 21 5 17 9"/><path d="M3 11V9a4 4 0 0 1 4-4h14"/>
+              <polyline points="7 23 3 19 7 15"/><path d="M21 13v2a4 4 0 0 1-4 4H3"/>
+            </svg>
+            <svg id="icon-mode-loop-para" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:none">
+              <path d="M21 12a9 9 0 1 1-3-6.7L21 8"/><path d="M21 3v5h-5"/>
+              <circle cx="12" cy="12" r="2.2" fill="currentColor" stroke="none"/>
+            </svg>
+            <svg id="icon-mode-repeat" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:none">
+              <polyline points="17 1 21 5 17 9"/><path d="M3 11V9a4 4 0 0 1 4-4h14"/>
+              <polyline points="7 23 3 19 7 15"/><path d="M21 13v2a4 4 0 0 1-4 4H3"/>
+              <path d="M12 9.5v5"/>
+            </svg>
+            <svg id="icon-mode-shuffle" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:none">
+              <polyline points="16 3 21 3 21 8"/><line x1="4" y1="20" x2="21" y2="3"/>
+              <polyline points="21 16 21 21 16 21"/><line x1="15" y1="15" x2="21" y2="21"/>
+              <line x1="4" y1="4" x2="9" y2="9"/>
+            </svg>
+            <span id="label-play-mode">顺次播放</span>
+          </button>
         </div>
-        <div class="progress-meta-right">
-          <span id="hover-preview" class="hover-preview">00:00</span>
-          <span id="time-duration" class="time-code-muted">00:00</span>
+
+        <!-- 辅助与视图状态行：同步滚动 / 字号 / 底部按钮 + 倍速 / 音量 / 分栏 / 保存 / 同步 / 主题 -->
+        <div class="utility-controls-row">
+          <!-- 同步滚动 / 自由滚动 -->
+          <button id="btn-scroll-mode" class="btn btn-scroll-mode active-sync" type="button" title="同步滚动：字幕随音频自动滚动且锁定手工滑动；点击切换为自由滚动">
+            <svg id="icon-scroll-lock" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+              <rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/>
+            </svg>
+            <svg id="icon-scroll-free" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" style="display:none">
+              <rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 9.9-1"/>
+            </svg>
+            <span id="label-scroll-mode">同步滚动</span>
+          </button>
+
+          <!-- 字号三档切换：正常 / 中 / 大 -->
+          <button id="btn-font-size" class="btn" type="button" title="切换字幕字号：正常 / 中 / 大">
+            <span style="font-weight:700">A</span>
+            <span id="label-font-size">字号:正常</span>
+          </button>
+
+          <!-- 操作按钮位置切换：按钮底部 / 按钮顶部 -->
+          <button id="btn-dock-pos" class="btn" type="button" title="将操作按钮整体移至屏幕下方或切回上方">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M7 4v16"/><polyline points="3 8 7 4 11 8"/>
+              <path d="M17 20V4"/><polyline points="13 16 17 20 21 16"/>
+            </svg>
+            <span id="label-dock-pos">按钮底部</span>
+          </button>
+
+          <button id="btn-speed" class="btn btn-mono" type="button" title="切换播放倍速">1.0x</button>
+
+          <div class="volume-group desktop-only">
+            <button id="btn-mute" class="btn btn-icon" type="button" title="静音 / 取消静音">
+              <svg id="icon-vol" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/>
+                <path d="M15.54 8.46a5 5 0 0 1 0 7.07"/>
+                <path d="M19.07 4.93a10 10 0 0 1 0 14.14"/>
+              </svg>
+              <svg id="icon-muted" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:none">
+                <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/>
+                <line x1="23" y1="9" x2="17" y2="15"/><line x1="17" y1="9" x2="23" y2="15"/>
+              </svg>
+            </button>
+            <input id="volume-slider" class="volume-slider" type="range" min="0" max="1" step="0.05" value="1" aria-label="音量" />
+          </div>
+
+          <button id="btn-layout" class="btn" type="button" title="切换左右分栏 / 双语交错视图">
+            <span id="label-layout">左右分栏</span>
+          </button>
+
+          <!-- 保存到本地硬盘 / 手机下载目录 -->
+          <div class="save-menu-wrap">
+            <button id="btn-save" class="btn" type="button" title="将当前音频和字幕保存到本地">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+                <polyline points="7 10 12 15 17 10"/>
+                <line x1="12" y1="15" x2="12" y2="3"/>
+              </svg>
+              <span>保存</span>
+            </button>
+            <div id="save-dropdown" class="save-dropdown" role="menu">
+              <div class="save-dropdown-title">保存当前期数到本地</div>
+              <button class="save-item save-item-featured" data-download="zip" type="button">
+                <span>打包下载（音频 + 全部字幕）</span>
+                <span class="save-ext">.zip</span>
+              </button>
+              <div class="save-divider"></div>
+              <button class="save-item" data-download="audio" type="button">
+                <span>仅保存音频文件</span>
+                <span class="save-ext">.mp3</span>
+              </button>
+              <button class="save-item" data-download="srt_en" type="button">
+                <span>保存英文字幕</span>
+                <span class="save-ext">.srt</span>
+              </button>
+              <button class="save-item" data-download="srt_zh" type="button">
+                <span>保存中文字幕</span>
+                <span class="save-ext">.srt</span>
+              </button>
+              <button class="save-item" data-download="srt_bilingual" type="button">
+                <span>保存双语对照字幕</span>
+                <span class="save-ext">.srt</span>
+              </button>
+              <button class="save-item" data-download="txt" type="button">
+                <span>保存双语对照文稿</span>
+                <span class="save-ext">.txt</span>
+              </button>
+            </div>
+          </div>
+
+          <button id="btn-sync" class="btn" type="button" title="检查并同步 CBC 最新音频">
+            <svg id="icon-sync" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M21 12a9 9 0 0 0-9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/>
+              <path d="M3 3v5h5"/>
+              <path d="M3 12a9 9 0 0 0 9 9 9.75 9.75 0 0 0 6.74-2.74L21 16"/>
+              <path d="M16 16h5v5"/>
+            </svg>
+            <span id="label-sync">同步</span>
+          </button>
+
+          <button id="btn-install" class="btn btn-install hidden" type="button" title="安装到手机桌面，像 App 一样全屏打开">
+            📲 安装
+          </button>
+
+          <button id="btn-theme" class="btn btn-icon" type="button" title="切换浅色 / 深色主题">
+            <span id="theme-icon">🌙</span>
+          </button>
         </div>
       </div>
 
-      <div
-        id="progress-hit"
-        class="progress-hit"
-        role="slider"
-        aria-label="播放进度条"
-        aria-valuemin="0"
-        aria-valuemax="100"
-        aria-valuenow="0"
-        tabindex="0"
-      >
-        <div class="progress-track">
-          <div id="progress-buffer" class="progress-buffer"></div>
-          <div id="progress-fill" class="progress-fill"></div>
+      <!-- 超长全宽播放进度条 -->
+      <div class="progress-bar-section" aria-label="播放进度控制条">
+        <div class="progress-meta">
+          <div class="progress-meta-left">
+            <span id="time-current" class="time-code">00:00</span>
+            <span id="episode-meta-hint" class="episode-meta-hint">准备就绪 · 支持 Space 播放/暂停，← / → 切换前后段落</span>
+          </div>
+          <div class="progress-meta-right">
+            <span id="hover-preview" class="hover-preview">00:00</span>
+            <span id="time-duration" class="time-code-muted">00:00</span>
+          </div>
         </div>
-        <div id="progress-thumb" class="progress-thumb"></div>
+
+        <div
+          id="progress-hit"
+          class="progress-hit"
+          role="slider"
+          aria-label="播放进度条"
+          aria-valuemin="0"
+          aria-valuemax="100"
+          aria-valuenow="0"
+          tabindex="0"
+        >
+          <div class="progress-track">
+            <div id="progress-buffer" class="progress-buffer"></div>
+            <div id="progress-fill" class="progress-fill"></div>
+          </div>
+          <div id="progress-thumb" class="progress-thumb"></div>
+        </div>
       </div>
     </section>
 
-    <!-- 3. 底部：字幕展示区（左右分栏采用统一网格行锁定对齐+永久同步滚动；手机竖屏默认双语交错段落） -->
+    <!-- 3. 字幕展示区（左右双栏锁定对齐 + 永久同步滚动；可切双语交错流） -->
     <main id="subtitles-main" class="subtitles-grid" aria-label="中英文同步字幕">
       <!-- 左右双栏锁定同步模式 -->
       <section class="subtitle-panel split-only split-sync-panel">
         <div class="split-sync-header">
           <div class="split-col-head">
-            <span class="panel-title">英文字幕 · English</span>
+            <span class="panel-title">ENGLISH</span>
             <span id="counter-en" class="line-counter">第 0 / 0 段</span>
           </div>
           <div class="split-col-head split-col-head-right">
-            <span class="panel-title">中文字幕 · 中文</span>
-            <div class="panel-header-right">
-              <button id="btn-follow" class="btn-follow" type="button">回到当前句</button>
-              <span id="counter-zh" class="line-counter">第 0 / 0 段</span>
-            </div>
+            <span class="panel-title">简体中文</span>
+            <span id="counter-zh" class="line-counter">第 0 / 0 段</span>
           </div>
         </div>
         <div id="panel-split" class="subtitle-scroll split-sync-scroll">
-          <div class="status-placeholder">正在连接 CBC 最新音频...</div>
+          <div class="status-placeholder">正在加载节目列表...</div>
         </div>
       </section>
 
-      <!-- 双语交错模式（手机竖屏主力视图） -->
+      <!-- 双语交错模式（上下双语自然段） -->
       <section class="subtitle-panel stack-only">
         <div class="panel-header">
-          <span class="panel-title">中英同步分段字幕 · Bilingual</span>
-          <div class="panel-header-right">
-            <button id="btn-follow-stack" class="btn-follow" type="button">回到当前句</button>
-            <span id="counter-stack" class="line-counter">第 0 / 0 段</span>
-          </div>
+          <span class="panel-title">ENGLISH / 简体中文</span>
+          <span id="counter-stack" class="line-counter">第 0 / 0 段</span>
         </div>
         <div id="panel-stack" class="subtitle-scroll">
-          <div class="status-placeholder">正在连接 CBC 最新音频...</div>
+          <div class="status-placeholder">正在加载节目列表...</div>
         </div>
       </section>
     </main>
@@ -240,6 +268,13 @@
 
   <audio id="audio-player" preload="metadata" playsinline></audio>
   <div id="toast" class="toast" role="status" aria-live="polite"></div>
+
+  <!-- 双子座彩蛋弹窗 -->
+  <div id="easter-overlay" class="easter-overlay" aria-hidden="true">
+    <div class="easter-card">
+      <img id="easter-img" class="easter-img" src="" alt="双子座彩蛋表情包" />
+    </div>
+  </div>
 
   <script src="./app.js"></script>
 </body>

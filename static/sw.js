@@ -1,4 +1,4 @@
-const CACHE_NAME = "cbc-bilingual-player-v5";
+const CACHE_NAME = "cbc-bilingual-player-v7";
 const SHELL_ASSETS = [
   "./",
   "./index.html",
@@ -6,7 +6,9 @@ const SHELL_ASSETS = [
   "./app.js",
   "./manifest.json",
   "./icons/icon-192.png",
-  "./icons/icon-512.png"
+  "./icons/icon-512.png",
+  "./icons/easter-1.png",
+  "./icons/easter-2.png"
 ];
 
 self.addEventListener("install", (event) => {
