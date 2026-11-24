@@ -24,12 +24,13 @@ logger = logging.getLogger("sync_static")
 
 HTTP_HEADERS = {"User-Agent": "CBC-Bilingual-Player-StaticSync/1.0"}
 
-# Limits for static GitHub Pages artifact size & fast Actions runs
+# Limits for static GitHub Pages artifact size (must stay safely under GitHub Pages' ~100 MB deploy cap)
 AUDIO_ARCHIVE_LIMITS = {
-    "twth": 24,  # Keep 24 archived hourly MP3s (~110 MB max)
-    "wr": 3,     # Keep latest 3 World Report MP3s (~28 MB)
-    "ywt": 1,    # Keep latest 1 Your World Tonight MP3 (~25 MB)
+    "twth": 12,  # Keep latest 12 archived hourly MP3s (~58 MB)
+    "wr": 2,     # Keep latest 2 World Report MP3s (~19 MB)
+    "ywt": 0,    # Stream 30-min Your World Tonight from CBC CDN while archiving its bilingual subtitles locally
 }
+MAX_AUDIO_TOTAL_BYTES = 85 * 1024 * 1024  # Hard cap: 85 MB total MP3s so Pages deploy never exceeds 100 MB
 AUTO_TRANSCRIBE_TOP = {
     "twth": 1,   # Always transcribe newest hourly episode (previous hours stay archived)
     "wr": 2,     # Ensure latest 2 World Report episodes have ready bilingual subtitles
@@ -238,13 +239,14 @@ async def build_static_site(out_dir: Path, prev_site_url: str | None, seed_local
                         ep["duration"] = int(round(total_dur))
                     logger.info("Generated %d bilingual lines for %s", len(subtitles), ep_id)
 
-    # Enforce per-feed MP3 archive cap to keep Pages artifact compact
+    # Enforce per-feed MP3 archive cap AND global 85 MB budget so GitHub Pages deploy stays well under 100 MB
     valid_audio_ids: set[str] = set()
     valid_sub_ids: set[str] = set()
+    total_audio_bytes = 0
     for feed in FEEDS:
         key = feed["key"]
         feed_eps = [e for e in kept_episodes if e.get("feed_key") == key]
-        audio_cap = AUDIO_ARCHIVE_LIMITS.get(key, 1)
+        audio_cap = AUDIO_ARCHIVE_LIMITS.get(key, 0)
         for idx, ep in enumerate(feed_eps):
             ep_id = ep["id"]
             if (sub_dir / f"{ep_id}.json").exists():
@@ -256,8 +258,11 @@ async def build_static_site(out_dir: Path, prev_site_url: str | None, seed_local
                 ep["has_subtitles"] = False
                 ep.pop("static_subtitle_path", None)
 
-            if idx < audio_cap and (audio_dir / f"{ep_id}.mp3").exists():
+            aud_path = audio_dir / f"{ep_id}.mp3"
+            aud_size = aud_path.stat().st_size if aud_path.exists() else 0
+            if idx < audio_cap and aud_size > 1000 and (total_audio_bytes + aud_size) <= MAX_AUDIO_TOTAL_BYTES:
                 valid_audio_ids.add(ep_id)
+                total_audio_bytes += aud_size
                 ep["has_audio"] = True
                 ep["static_audio_path"] = f"data/audio/{ep_id}.mp3"
             else:
@@ -270,6 +275,7 @@ async def build_static_site(out_dir: Path, prev_site_url: str | None, seed_local
     for f in sub_dir.glob("*.json"):
         if f.stem not in valid_sub_ids:
             f.unlink(missing_ok=True)
+    logger.info("Archived MP3 payload size: %.1f MB (%d files)", total_audio_bytes / (1024 * 1024), len(valid_audio_ids))
 
     # Sort final list: The World This Hour -> World Report -> Your World Tonight, newest first
     kept_episodes.sort(key=lambda e: (feed_order.get(e.get("feed_key", ""), 99), -float(e.get("pub_ts", 0.0))))
