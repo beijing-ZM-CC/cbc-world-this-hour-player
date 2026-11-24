@@ -222,6 +222,14 @@ html, body {
   font-weight: 600;
 }
 
+.btn-play-mode[data-mode="repeat_one"],
+.btn-play-mode[data-mode="shuffle"] {
+  background: var(--primary-soft);
+  border-color: color-mix(in srgb, var(--primary) 35%, var(--border));
+  color: var(--primary);
+  font-weight: 600;
+}
+
 .btn-icon {
   width: 34px;
   padding: 0;
@@ -708,14 +716,21 @@ html, body {
     order: 2;
     width: 100%;
     justify-content: space-between;
-    gap: 6px;
+    gap: 5px;
     flex: 0 0 auto;
+    flex-wrap: nowrap;
   }
 
   .right-tools .btn {
     height: 34px;
-    padding: 0 9px;
-    font-size: 12px;
+    padding: 0 7px;
+    font-size: 11.5px;
+    gap: 4px;
+  }
+
+  .right-tools .btn-icon {
+    width: 34px;
+    padding: 0;
   }
 
   .subtitles-grid {

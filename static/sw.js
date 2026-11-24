@@ -1,4 +1,4 @@
-const CACHE_NAME = "cbc-bilingual-player-v3";
+const CACHE_NAME = "cbc-bilingual-player-v4";
 const SHELL_ASSETS = [
   "./",
   "./index.html",

@@ -20,6 +20,11 @@
   const iconVol = document.getElementById("icon-vol");
   const iconMuted = document.getElementById("icon-muted");
   const volumeSlider = document.getElementById("volume-slider");
+  const btnPlayMode = document.getElementById("btn-play-mode");
+  const iconModeSequential = document.getElementById("icon-mode-sequential");
+  const iconModeRepeat = document.getElementById("icon-mode-repeat");
+  const iconModeShuffle = document.getElementById("icon-mode-shuffle");
+  const labelPlayMode = document.getElementById("label-play-mode");
   const btnLayout = document.getElementById("btn-layout");
   const labelLayout = document.getElementById("label-layout");
   const btnSave = document.getElementById("btn-save");
@@ -64,6 +69,17 @@
   let toastTimer = null;
   let deferredInstallPrompt = null;
   let layoutMode = window.innerWidth <= 760 ? "stack" : "split";
+  let pendingAutoPlay = false;
+
+  const PLAY_MODE_ORDER = ["sequential", "repeat_one", "shuffle"];
+  const PLAY_MODE_META = {
+    sequential: { label: "顺次播放", tip: "当前：顺次播放（播完自动播放下一期）" },
+    repeat_one: { label: "单曲循环", tip: "当前：单曲循环（播完重复播放本期）" },
+    shuffle: { label: "随机播放", tip: "当前：随机播放（播完随机切换下一期）" },
+  };
+  const savedPlayMode = localStorage.getItem("cbc_player_play_mode");
+  let playMode = PLAY_MODE_ORDER.includes(savedPlayMode) ? savedPlayMode : "sequential";
+  const shuffleHistory = new Set();
 
   function showToast(msg) {
     toastEl.textContent = msg;
@@ -201,7 +217,70 @@
       navigator.mediaSession.setActionHandler("seekto", (d) => {
         if (typeof d.seekTime === "number") seekTo(d.seekTime);
       });
+      navigator.mediaSession.setActionHandler("nexttrack", () => advanceEpisode(1, true));
+      navigator.mediaSession.setActionHandler("previoustrack", () => advanceEpisode(-1, true));
     } catch (_) {}
+  }
+
+  // 播放模式切换（顺次播放 / 单曲循环 / 随机播放）
+  function applyPlayMode(mode, notify = false) {
+    playMode = PLAY_MODE_ORDER.includes(mode) ? mode : "sequential";
+    localStorage.setItem("cbc_player_play_mode", playMode);
+    const meta = PLAY_MODE_META[playMode];
+    labelPlayMode.textContent = meta.label;
+    btnPlayMode.title = `${meta.tip}，点击切换`;
+    btnPlayMode.dataset.mode = playMode;
+    iconModeSequential.style.display = playMode === "sequential" ? "block" : "none";
+    iconModeRepeat.style.display = playMode === "repeat_one" ? "block" : "none";
+    iconModeShuffle.style.display = playMode === "shuffle" ? "block" : "none";
+    if (notify) showToast(`已切换为：${meta.label}`);
+  }
+  applyPlayMode(playMode, false);
+
+  btnPlayMode.addEventListener("click", () => {
+    const nextIdx = (PLAY_MODE_ORDER.indexOf(playMode) + 1) % PLAY_MODE_ORDER.length;
+    applyPlayMode(PLAY_MODE_ORDER[nextIdx], true);
+  });
+
+  function pickNextEpisodeIndex(direction = 1) {
+    if (!episodes.length) return -1;
+    const curIdx = episodes.findIndex((e) => e.id === currentEpisode?.id);
+    if (episodes.length === 1) return 0;
+
+    if (playMode === "shuffle") {
+      if (currentEpisode?.id) shuffleHistory.add(currentEpisode.id);
+      let candidates = episodes
+        .map((ep, idx) => ({ ep, idx }))
+        .filter(({ ep, idx }) => idx !== curIdx && !shuffleHistory.has(ep.id));
+      if (!candidates.length) {
+        shuffleHistory.clear();
+        if (currentEpisode?.id) shuffleHistory.add(currentEpisode.id);
+        candidates = episodes.map((ep, idx) => ({ ep, idx })).filter(({ idx }) => idx !== curIdx);
+      }
+      const chosen = candidates[Math.floor(Math.random() * candidates.length)];
+      return chosen ? chosen.idx : 0;
+    }
+
+    const base = curIdx >= 0 ? curIdx : 0;
+    return (base + direction + episodes.length) % episodes.length;
+  }
+
+  function advanceEpisode(direction = 1, fromManual = false) {
+    if (!episodes.length) return;
+    if (!fromManual && playMode === "repeat_one") {
+      autoFollow = true;
+      setFollowVisible(false);
+      audio.currentTime = 0;
+      syncSubtitleHighlight(true);
+      audio.play().catch(() => {});
+      return;
+    }
+    const targetIdx = pickNextEpisodeIndex(direction);
+    if (targetIdx < 0) return;
+    const targetEp = episodes[targetIdx];
+    const modeTag = playMode === "shuffle" ? "随机播放" : "顺次播放";
+    showToast(`${modeTag}：${targetEp.display_title}`);
+    selectEpisode(targetEp.id, true);
   }
 
   // 纯前端 SRT / TXT / 无压缩 ZIP 生成器（用于 GitHub Pages 静态模式下也能本地保存全部文件）
@@ -744,7 +823,12 @@
         startPollingEpisode(epId);
       }
 
-      if (autoPlay) audio.play().catch(() => {});
+      pendingAutoPlay = Boolean(autoPlay);
+      if (autoPlay) {
+        audio.play().then(() => {
+          pendingAutoPlay = false;
+        }).catch(() => {});
+      }
     } catch (err) {
       showToast(`加载失败: ${err.message}`);
     }
@@ -970,10 +1054,20 @@
     updateMediaSessionPosition();
   });
   audio.addEventListener("pause", () => {
+    pendingAutoPlay = false;
     updatePlayButton();
     updateMediaSessionPosition();
   });
-  audio.addEventListener("ended", updatePlayButton);
+  audio.addEventListener("ended", () => {
+    updatePlayButton();
+    advanceEpisode(1, false);
+  });
+  audio.addEventListener("canplay", () => {
+    if (pendingAutoPlay && audio.paused) {
+      pendingAutoPlay = false;
+      audio.play().catch(() => {});
+    }
+  });
   audio.addEventListener("loadedmetadata", () => {
     updateProgressUI();
     syncSubtitleHighlight(true);
