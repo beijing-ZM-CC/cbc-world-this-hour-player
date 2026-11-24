@@ -46,8 +46,7 @@
   const episodeMetaHint = document.getElementById("episode-meta-hint");
 
   const subtitlesMain = document.getElementById("subtitles-main");
-  const panelEn = document.getElementById("panel-en");
-  const panelZh = document.getElementById("panel-zh");
+  const panelSplit = document.getElementById("panel-split");
   const panelStack = document.getElementById("panel-stack");
   const counterEn = document.getElementById("counter-en");
   const counterZh = document.getElementById("counter-zh");
@@ -60,7 +59,16 @@
   let episodes = [];
   let currentEpisode = null;
   let subtitles = [];
+  let paragraphs = [];
+  let sentenceToPara = [];
+  let splitEnSpans = [];
+  let splitZhSpans = [];
+  let stackEnSpans = [];
+  let stackZhSpans = [];
+  let splitRowEls = [];
+  let stackCardEls = [];
   let activeIndex = -1;
+  let activeParaIndex = -1;
   let speedIdx = 0;
   let autoFollow = true;
   let isDragging = false;
@@ -293,6 +301,21 @@
     }).join("\n");
   }
 
+  function groupSubtitlesByParagraph(list) {
+    const groups = [];
+    list.forEach((item, idx) => {
+      const pKey = typeof item.paragraph === "number" ? item.paragraph : idx;
+      if (!groups.length || groups[groups.length - 1].key !== pKey) {
+        groups.push({ key: pKey, index: groups.length, start: item.start, end: item.end, items: [{ idx, item }] });
+      } else {
+        const g = groups[groups.length - 1];
+        g.end = item.end;
+        g.items.push({ idx, item });
+      }
+    });
+    return groups;
+  }
+
   function buildBilingualTxt(ep, list) {
     const header = [
       `Title: ${ep.display_title || ep.title || ""}`,
@@ -301,12 +324,14 @@
       "================================================================",
       "",
     ];
-    for (const item of list) {
-      header.push(`[${formatTime(item.start)} - ${formatTime(item.end)}]`);
-      header.push((item.en || "").trim());
-      if (item.zh) header.push(item.zh.trim());
+    const groups = groupSubtitlesByParagraph(list);
+    groups.forEach((g, pi) => {
+      header.push(`[第 ${pi + 1} 段 · ${formatTime(g.start)} - ${formatTime(g.end)}]`);
+      header.push(g.items.map(({ item }) => (item.en || "").trim()).filter(Boolean).join(" "));
+      const zhText = g.items.map(({ item }) => (item.zh || "").trim()).filter(Boolean).join("");
+      if (zhText) header.push(zhText);
       header.push("");
-    }
+    });
     return header.join("\n");
   }
 
@@ -532,12 +557,11 @@
            <div style="font-size:12px">您可以先点击「播放」收听音频</div>
          </div>`;
 
-    panelEn.innerHTML = html;
-    panelZh.innerHTML = html;
+    panelSplit.innerHTML = html;
     panelStack.innerHTML = html;
-    counterEn.textContent = "0 / 0";
-    counterZh.textContent = "0 / 0";
-    counterStack.textContent = "0 / 0";
+    counterEn.textContent = "第 0 / 0 段";
+    counterZh.textContent = "第 0 / 0 段";
+    counterStack.textContent = "第 0 / 0 段";
 
     if (appMode === "api") {
       document.querySelectorAll(".btn-retry").forEach((b) => {
@@ -556,10 +580,18 @@
   }
 
   function renderSubtitles() {
-    panelEn.innerHTML = "";
-    panelZh.innerHTML = "";
+    panelSplit.innerHTML = "";
     panelStack.innerHTML = "";
+    paragraphs = [];
+    sentenceToPara = [];
+    splitEnSpans = [];
+    splitZhSpans = [];
+    stackEnSpans = [];
+    stackZhSpans = [];
+    splitRowEls = [];
+    stackCardEls = [];
     activeIndex = -1;
+    activeParaIndex = -1;
 
     if (!subtitles.length) {
       renderStatusPlaceholder(currentEpisode);
@@ -567,101 +599,151 @@
       return;
     }
 
-    const fragEn = document.createDocumentFragment();
-    const fragZh = document.createDocumentFragment();
+    paragraphs = groupSubtitlesByParagraph(subtitles);
+    const fragSplit = document.createDocumentFragment();
     const fragStack = document.createDocumentFragment();
 
-    subtitles.forEach((item, idx) => {
-      const onLineClick = () => {
-        autoFollow = true;
-        setFollowVisible(false);
-        seekTo(item.start + 0.05);
-        if (audio.paused) audio.play().catch(() => {});
-      };
+    paragraphs.forEach((para, pIdx) => {
+      const metaText = `第 ${pIdx + 1} 段 · ${formatTime(para.start)} - ${formatTime(para.end)}`;
 
-      const makeSplitLine = (text) => {
-        const row = document.createElement("div");
-        row.className = "subtitle-line";
-        row.dataset.index = String(idx);
-        const ts = document.createElement("span");
-        ts.className = "subtitle-ts";
-        ts.textContent = formatTime(item.start);
-        const body = document.createElement("span");
-        body.textContent = text;
-        row.appendChild(ts);
-        row.appendChild(body);
-        row.addEventListener("click", onLineClick);
-        row.addEventListener("mouseenter", () => setPairHover(idx, true));
-        row.addEventListener("mouseleave", () => setPairHover(idx, false));
-        return row;
-      };
+      // 1. 锁定对齐的左右分栏网格行（左英 + 右中在同一网格行，顶边/高度永久对齐并同步滚动）
+      const pairRow = document.createElement("div");
+      pairRow.className = "para-pair-row";
+      pairRow.dataset.paraIndex = String(pIdx);
 
-      const makeStackLine = () => {
-        const row = document.createElement("div");
-        row.className = "subtitle-line";
-        row.dataset.index = String(idx);
-        const ts = document.createElement("span");
-        ts.className = "subtitle-ts";
-        ts.textContent = formatTime(item.start);
-        const body = document.createElement("div");
-        body.className = "stack-body";
-        const enDiv = document.createElement("div");
-        enDiv.className = "stack-en";
-        enDiv.textContent = item.en || "";
-        const zhDiv = document.createElement("div");
-        zhDiv.className = "stack-zh";
-        zhDiv.textContent = item.zh || item.en || "";
-        body.appendChild(enDiv);
-        body.appendChild(zhDiv);
-        row.appendChild(ts);
-        row.appendChild(body);
-        row.addEventListener("click", onLineClick);
-        return row;
-      };
+      const enCard = document.createElement("article");
+      enCard.className = "para-card para-card-en";
+      const enMeta = document.createElement("div");
+      enMeta.className = "para-meta";
+      enMeta.textContent = metaText;
+      const enProse = document.createElement("p");
+      enProse.className = "para-prose";
 
-      fragEn.appendChild(makeSplitLine(item.en || ""));
-      fragZh.appendChild(makeSplitLine(item.zh || item.en || ""));
-      fragStack.appendChild(makeStackLine());
+      const zhCard = document.createElement("article");
+      zhCard.className = "para-card para-card-zh";
+      const zhMeta = document.createElement("div");
+      zhMeta.className = "para-meta";
+      zhMeta.textContent = metaText;
+      const zhProse = document.createElement("p");
+      zhProse.className = "para-prose";
+
+      // 2. 手机竖屏双语交错段落卡片
+      const stackCard = document.createElement("article");
+      stackCard.className = "para-card stack-para-card";
+      stackCard.dataset.paraIndex = String(pIdx);
+      const stackMeta = document.createElement("div");
+      stackMeta.className = "para-meta";
+      stackMeta.textContent = metaText;
+      const stackEnProse = document.createElement("p");
+      stackEnProse.className = "para-prose stack-en";
+      const stackDiv = document.createElement("div");
+      stackDiv.className = "stack-divider";
+      const stackZhProse = document.createElement("p");
+      stackZhProse.className = "para-prose stack-zh";
+
+      para.items.forEach(({ idx, item }, localIdx) => {
+        sentenceToPara[idx] = pIdx;
+        const onSentClick = () => {
+          autoFollow = true;
+          setFollowVisible(false);
+          seekTo(item.start + 0.05);
+          if (audio.paused) audio.play().catch(() => {});
+        };
+
+        const enText = localIdx > 0 ? ` ${item.en || ""}` : (item.en || "");
+        const zhText = item.zh || item.en || "";
+
+        const spEn = document.createElement("span");
+        spEn.className = "sent-span";
+        spEn.dataset.index = String(idx);
+        spEn.textContent = enText;
+        spEn.addEventListener("click", onSentClick);
+        spEn.addEventListener("mouseenter", () => setPairHover(idx, true));
+        spEn.addEventListener("mouseleave", () => setPairHover(idx, false));
+
+        const spZh = document.createElement("span");
+        spZh.className = "sent-span";
+        spZh.dataset.index = String(idx);
+        spZh.textContent = zhText;
+        spZh.addEventListener("click", onSentClick);
+        spZh.addEventListener("mouseenter", () => setPairHover(idx, true));
+        spZh.addEventListener("mouseleave", () => setPairHover(idx, false));
+
+        const stEn = document.createElement("span");
+        stEn.className = "sent-span";
+        stEn.dataset.index = String(idx);
+        stEn.textContent = enText;
+        stEn.addEventListener("click", onSentClick);
+
+        const stZh = document.createElement("span");
+        stZh.className = "sent-span";
+        stZh.dataset.index = String(idx);
+        stZh.textContent = zhText;
+        stZh.addEventListener("click", onSentClick);
+
+        enProse.appendChild(spEn);
+        zhProse.appendChild(spZh);
+        stackEnProse.appendChild(stEn);
+        stackZhProse.appendChild(stZh);
+
+        splitEnSpans[idx] = spEn;
+        splitZhSpans[idx] = spZh;
+        stackEnSpans[idx] = stEn;
+        stackZhSpans[idx] = stZh;
+      });
+
+      enCard.appendChild(enMeta);
+      enCard.appendChild(enProse);
+      zhCard.appendChild(zhMeta);
+      zhCard.appendChild(zhProse);
+      pairRow.appendChild(enCard);
+      pairRow.appendChild(zhCard);
+      splitRowEls[pIdx] = pairRow;
+      fragSplit.appendChild(pairRow);
+
+      stackCard.appendChild(stackMeta);
+      stackCard.appendChild(stackEnProse);
+      stackCard.appendChild(stackDiv);
+      stackCard.appendChild(stackZhProse);
+      stackCardEls[pIdx] = stackCard;
+      fragStack.appendChild(stackCard);
     });
 
-    panelEn.appendChild(fragEn);
-    panelZh.appendChild(fragZh);
+    panelSplit.appendChild(fragSplit);
     panelStack.appendChild(fragStack);
 
-    counterEn.textContent = `1 / ${subtitles.length}`;
-    counterZh.textContent = `1 / ${subtitles.length}`;
-    counterStack.textContent = `1 / ${subtitles.length}`;
+    const initCounter = `第 1 / ${paragraphs.length} 段`;
+    counterEn.textContent = initCounter;
+    counterZh.textContent = initCounter;
+    counterStack.textContent = initCounter;
     updateDownloadMenuState();
     syncSubtitleHighlight(true);
   }
 
   function setPairHover(idx, on) {
     if (idx === activeIndex) return;
-    panelEn.children[idx]?.classList.toggle("pair-hover", on);
-    panelZh.children[idx]?.classList.toggle("pair-hover", on);
+    splitEnSpans[idx]?.classList.toggle("pair-hover", on);
+    splitZhSpans[idx]?.classList.toggle("pair-hover", on);
+  }
+
+  function scrollContainerToElement(container, el, smooth) {
+    if (!container || !el) return;
+    const cRect = container.getBoundingClientRect();
+    const eRect = el.getBoundingClientRect();
+    const targetTop = Math.max(0, container.scrollTop + (eRect.top - cRect.top) - container.clientHeight * 0.28);
+    container.scrollTo({ top: targetTop, behavior: smooth ? "smooth" : "auto" });
   }
 
   function scrollPanelsTo(idx, smooth = true) {
     programmaticScrollUntil = performance.now() + 500;
-    const behavior = smooth ? "smooth" : "auto";
-
     if (layoutMode === "stack") {
-      const stEl = panelStack.children[idx];
-      if (stEl) {
-        const target = Math.max(0, stEl.offsetTop - panelStack.clientHeight * 0.28);
-        panelStack.scrollTo({ top: target, behavior });
-      }
+      const targetEl = stackEnSpans[idx] || stackCardEls[sentenceToPara[idx]];
+      scrollContainerToElement(panelStack, targetEl, smooth);
       return;
     }
-
-    const enEl = panelEn.children[idx];
-    const zhEl = panelZh.children[idx];
-    if (enEl && zhEl) {
-      const targetEn = Math.max(0, enEl.offsetTop - panelEn.clientHeight * 0.28);
-      const targetZh = Math.max(0, zhEl.offsetTop - panelZh.clientHeight * 0.28);
-      panelEn.scrollTo({ top: targetEn, behavior });
-      panelZh.scrollTo({ top: targetZh, behavior });
-    }
+    // 统一滚动容器：只需滚动 #panel-split，左英右中永远 100% 锁定同步！
+    const targetEl = splitEnSpans[idx] || splitRowEls[sentenceToPara[idx]];
+    scrollContainerToElement(panelSplit, targetEl, smooth);
   }
 
   function findActiveIndex(t) {
@@ -682,18 +764,30 @@
 
     if (idx !== activeIndex || forceScroll) {
       if (activeIndex >= 0) {
-        panelEn.children[activeIndex]?.classList.remove("active");
-        panelZh.children[activeIndex]?.classList.remove("active");
-        panelStack.children[activeIndex]?.classList.remove("active");
+        splitEnSpans[activeIndex]?.classList.remove("active");
+        splitZhSpans[activeIndex]?.classList.remove("active");
+        stackEnSpans[activeIndex]?.classList.remove("active");
+        stackZhSpans[activeIndex]?.classList.remove("active");
       }
-      activeIndex = idx;
-      panelEn.children[activeIndex]?.classList.remove("pair-hover");
-      panelZh.children[activeIndex]?.classList.remove("pair-hover");
-      panelEn.children[activeIndex]?.classList.add("active");
-      panelZh.children[activeIndex]?.classList.add("active");
-      panelStack.children[activeIndex]?.classList.add("active");
+      if (activeParaIndex >= 0) {
+        splitRowEls[activeParaIndex]?.classList.remove("para-active");
+        stackCardEls[activeParaIndex]?.classList.remove("para-active");
+      }
 
-      const text = `${activeIndex + 1} / ${subtitles.length}`;
+      activeIndex = idx;
+      activeParaIndex = sentenceToPara[activeIndex] ?? 0;
+
+      splitRowEls[activeParaIndex]?.classList.add("para-active");
+      stackCardEls[activeParaIndex]?.classList.add("para-active");
+
+      splitEnSpans[activeIndex]?.classList.remove("pair-hover");
+      splitZhSpans[activeIndex]?.classList.remove("pair-hover");
+      splitEnSpans[activeIndex]?.classList.add("active");
+      splitZhSpans[activeIndex]?.classList.add("active");
+      stackEnSpans[activeIndex]?.classList.add("active");
+      stackZhSpans[activeIndex]?.classList.add("active");
+
+      const text = `第 ${activeParaIndex + 1} / ${paragraphs.length} 段`;
       counterEn.textContent = text;
       counterZh.textContent = text;
       counterStack.textContent = text;
@@ -1035,7 +1129,7 @@
       setFollowVisible(true);
     }
   }
-  [panelEn, panelZh, panelStack].forEach((p) => {
+  [panelSplit, panelStack].forEach((p) => {
     p.addEventListener("wheel", onUserManualScroll, { passive: true });
     p.addEventListener("touchmove", onUserManualScroll, { passive: true });
   });

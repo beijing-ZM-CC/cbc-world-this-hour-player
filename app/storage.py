@@ -9,6 +9,7 @@ from pathlib import Path
 from typing import Any
 
 from .config import AUDIO_DIR, FEEDS, INDEX_FILE, SUBTITLE_DIR
+from .paragrapher import upgrade_subtitles_with_paragraphs
 
 
 def format_srt_timestamp(seconds: float) -> str:
@@ -63,12 +64,25 @@ def build_bilingual_txt(episode: dict[str, Any], subtitles: list[dict[str, Any]]
         "=" * 64,
         "",
     ]
+    # Group by paragraph for clean article-style reading
+    groups: list[list[dict[str, Any]]] = []
     for item in subtitles:
-        ts = f"[{format_mmss(float(item.get('start', 0.0)))} - {format_mmss(float(item.get('end', 0.0)))}]"
+        p_id = item.get("paragraph")
+        if p_id is None:
+            groups.append([item])
+        elif not groups or groups[-1][0].get("paragraph") != p_id:
+            groups.append([item])
+        else:
+            groups[-1].append(item)
+
+    for idx, grp in enumerate(groups, start=1):
+        ts = f"[第 {idx} 段 · {format_mmss(float(grp[0].get('start', 0.0)))} - {format_mmss(float(grp[-1].get('end', 0.0)))}]"
+        en_para = " ".join((s.get("en") or "").strip() for s in grp if s.get("en"))
+        zh_para = "".join((s.get("zh") or "").strip() for s in grp if s.get("zh"))
         lines.append(ts)
-        lines.append(item.get("en", "").strip())
-        if item.get("zh"):
-            lines.append(item.get("zh", "").strip())
+        lines.append(en_para)
+        if zh_para:
+            lines.append(zh_para)
         lines.append("")
     return "\n".join(lines)
 
@@ -218,7 +232,15 @@ class EpisodeStore:
             return []
         try:
             data = json.loads(p.read_text(encoding="utf-8"))
-            return data if isinstance(data, list) else []
+            if not isinstance(data, list):
+                return []
+            if data and not all("paragraph" in s for s in data):
+                upgraded = upgrade_subtitles_with_paragraphs(data)
+                tmp = p.with_suffix(".json.tmp")
+                tmp.write_text(json.dumps(upgraded, ensure_ascii=False, indent=2), encoding="utf-8")
+                tmp.replace(p)
+                return upgraded
+            return data
         except Exception:
             return []
 

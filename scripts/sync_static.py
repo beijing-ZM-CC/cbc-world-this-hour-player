@@ -17,6 +17,7 @@ sys.path.insert(0, str(ROOT))
 
 from app.config import FEEDS, STATIC_DIR
 from app.feeds import fetch_feed_episodes
+from app.paragrapher import upgrade_subtitles_with_paragraphs
 from app.transcriber import SubtitleProcessor, _decode_audio_16k_mono, _normalize_segments, _translate_batch_en_to_zh
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
@@ -249,7 +250,16 @@ async def build_static_site(out_dir: Path, prev_site_url: str | None, seed_local
         audio_cap = AUDIO_ARCHIVE_LIMITS.get(key, 0)
         for idx, ep in enumerate(feed_eps):
             ep_id = ep["id"]
-            if (sub_dir / f"{ep_id}.json").exists():
+            sub_path = sub_dir / f"{ep_id}.json"
+            if sub_path.exists():
+                try:
+                    existing_subs = json.loads(sub_path.read_text(encoding="utf-8"))
+                    if isinstance(existing_subs, list) and existing_subs and not all("paragraph" in s for s in existing_subs):
+                        upgraded_subs = upgrade_subtitles_with_paragraphs(existing_subs)
+                        sub_path.write_text(json.dumps(upgraded_subs, ensure_ascii=False, indent=2), encoding="utf-8")
+                        ep["subtitle_count"] = len(upgraded_subs)
+                except Exception as exc:
+                    logger.warning("Failed upgrading paragraphs for %s: %s", ep_id, exc)
                 valid_sub_ids.add(ep_id)
                 ep["has_subtitles"] = True
                 ep["static_subtitle_path"] = f"data/subtitles/{ep_id}.json"

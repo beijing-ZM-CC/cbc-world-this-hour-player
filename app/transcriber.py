@@ -15,6 +15,7 @@ import numpy as np
 from faster_whisper import WhisperModel
 
 from .config import WHISPER_COMPUTE_TYPE, WHISPER_CPU_THREADS, WHISPER_MODEL
+from .paragrapher import assign_paragraphs, build_complete_sentences
 from .storage import store
 
 logger = logging.getLogger("cbc_player.transcriber")
@@ -49,38 +50,9 @@ def _clean_text(text: str) -> str:
 
 
 def _normalize_segments(raw_segments: list[dict[str, Any]]) -> list[dict[str, Any]]:
-    """Merge tiny fragments and ensure crisp readable sentence-level subtitle blocks."""
-    merged: list[dict[str, Any]] = []
-    for seg in raw_segments:
-        txt = _clean_text(seg["text"])
-        if not txt:
-            continue
-        start = round(float(seg["start"]), 2)
-        end = round(float(seg["end"]), 2)
-        if end <= start:
-            end = round(start + 0.5, 2)
-
-        if merged:
-            prev = merged[-1]
-            prev_txt = prev["en"]
-            gap = start - prev["end"]
-            prev_dur = prev["end"] - prev["start"]
-            # Merge short non-terminated fragment into previous line
-            if (
-                not re.search(r"[.!?\"']$", prev_txt)
-                and gap < 0.75
-                and (prev_dur + (end - start)) <= 10.5
-                and len(prev_txt) + len(txt) < 155
-            ):
-                prev["en"] = f"{prev_txt} {txt}"
-                prev["end"] = end
-                continue
-
-        merged.append({"start": start, "end": end, "en": txt, "zh": ""})
-
-    for idx, item in enumerate(merged):
-        item["id"] = idx
-    return merged
+    """Reconstruct complete English sentences and assign content-based paragraphs."""
+    sentences = build_complete_sentences(raw_segments, keep_zh=False)
+    return assign_paragraphs(sentences)
 
 
 def _google_gtx_translate(client: httpx.Client, text: str) -> str:

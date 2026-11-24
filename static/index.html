@@ -199,29 +199,24 @@
       </div>
     </section>
 
-    <!-- 3. 底部：字幕展示区（桌面默认左右双栏，手机竖屏默认双语交错流，支持一键互切） -->
+    <!-- 3. 底部：字幕展示区（左右分栏采用统一网格行锁定对齐+永久同步滚动；手机竖屏默认双语交错段落） -->
     <main id="subtitles-main" class="subtitles-grid" aria-label="中英文同步字幕">
-      <!-- 左右双栏模式：左栏英文字幕 -->
-      <section class="subtitle-panel split-only">
-        <div class="panel-header">
-          <span class="panel-title">英文字幕 · English</span>
-          <span id="counter-en" class="line-counter">0 / 0</span>
-        </div>
-        <div id="panel-en" class="subtitle-scroll">
-          <div class="status-placeholder">正在连接 CBC 最新音频...</div>
-        </div>
-      </section>
-
-      <!-- 左右双栏模式：右栏中文字幕 -->
-      <section class="subtitle-panel split-only">
-        <div class="panel-header">
-          <span class="panel-title">中文字幕 · 中文</span>
-          <div class="panel-header-right">
-            <button id="btn-follow" class="btn-follow" type="button">回到当前句</button>
-            <span id="counter-zh" class="line-counter">0 / 0</span>
+      <!-- 左右双栏锁定同步模式 -->
+      <section class="subtitle-panel split-only split-sync-panel">
+        <div class="split-sync-header">
+          <div class="split-col-head">
+            <span class="panel-title">英文字幕 · English</span>
+            <span id="counter-en" class="line-counter">第 0 / 0 段</span>
+          </div>
+          <div class="split-col-head split-col-head-right">
+            <span class="panel-title">中文字幕 · 中文</span>
+            <div class="panel-header-right">
+              <button id="btn-follow" class="btn-follow" type="button">回到当前句</button>
+              <span id="counter-zh" class="line-counter">第 0 / 0 段</span>
+            </div>
           </div>
         </div>
-        <div id="panel-zh" class="subtitle-scroll">
+        <div id="panel-split" class="subtitle-scroll split-sync-scroll">
           <div class="status-placeholder">正在连接 CBC 最新音频...</div>
         </div>
       </section>
@@ -229,10 +224,10 @@
       <!-- 双语交错模式（手机竖屏主力视图） -->
       <section class="subtitle-panel stack-only">
         <div class="panel-header">
-          <span class="panel-title">中英同步字幕 · Bilingual</span>
+          <span class="panel-title">中英同步分段字幕 · Bilingual</span>
           <div class="panel-header-right">
             <button id="btn-follow-stack" class="btn-follow" type="button">回到当前句</button>
-            <span id="counter-stack" class="line-counter">0 / 0</span>
+            <span id="counter-stack" class="line-counter">第 0 / 0 段</span>
           </div>
         </div>
         <div id="panel-stack" class="subtitle-scroll">
