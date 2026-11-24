@@ -26,7 +26,7 @@ FEEDS = [
         "name": "World Report",
         "label": "World Report（每日晨间新闻 · 10分钟）",
         "url": "https://www.cbc.ca/podcasting/includes/wr.xml",
-        "max_items": 7,         # Latest 7 days, all with paragraphed bilingual subtitles
+        "max_items": 4,         # Latest 4 days, all with full paragraphed bilingual subtitles
         "auto_process": False,  # Transcribe on demand locally; pre-generated in cloud Pages
     },
     {
@@ -34,7 +34,7 @@ FEEDS = [
         "name": "Your World Tonight",
         "label": "Your World Tonight（每日晚间新闻 · 30分钟）",
         "url": "https://www.cbc.ca/podcasting/includes/w6.xml",
-        "max_items": 5,         # Latest 5 days, all with paragraphed bilingual subtitles
+        "max_items": 2,         # Latest 2 days, all with full paragraphed bilingual subtitles
         "auto_process": False,  # Transcribe on demand locally; pre-generated in cloud Pages
     },
 ]

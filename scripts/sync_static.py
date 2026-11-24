@@ -4,6 +4,7 @@ import argparse
 import asyncio
 import json
 import logging
+import re
 import shutil
 import sys
 from datetime import datetime, timezone
@@ -34,9 +35,11 @@ AUDIO_ARCHIVE_LIMITS = {
 MAX_AUDIO_TOTAL_BYTES = 85 * 1024 * 1024  # Hard cap: 85 MB total MP3s so Pages deploy never exceeds 100 MB
 AUTO_TRANSCRIBE_TOP = {
     "twth": 48,  # Every archived hourly episode has full paragraphed bilingual subtitles
-    "wr": 7,     # All 7 World Report episodes have full paragraphed bilingual subtitles
-    "ywt": 5,    # All 5 Your World Tonight episodes have full paragraphed bilingual subtitles
+    "wr": 4,     # All 4 World Report episodes have full paragraphed bilingual subtitles
+    "ywt": 2,    # All 2 Your World Tonight episodes have full paragraphed bilingual subtitles
 }
+MAX_REPAIR_LINES_PER_RUN = 360
+CJK_RE = re.compile(r"[\u4e00-\u9fff]")
 
 
 def _download_file(client: httpx.Client, url: str, target: Path) -> bool:
@@ -246,10 +249,11 @@ async def build_static_site(out_dir: Path, prev_site_url: str | None, seed_local
                         ep["duration"] = int(round(total_dur))
                     logger.info("Generated %d bilingual lines for %s", len(subtitles), ep_id)
 
-    # Enforce per-feed MP3 archive cap AND global 85 MB budget so GitHub Pages deploy stays well under 100 MB
+    # Enforce per-feed MP3 archive cap AND global 85 MB budget, plus auto-repair any missing Chinese translations
     valid_audio_ids: set[str] = set()
     valid_sub_ids: set[str] = set()
     total_audio_bytes = 0
+    repaired_lines_total = 0
     for feed in FEEDS:
         key = feed["key"]
         feed_eps = [e for e in kept_episodes if e.get("feed_key") == key]
@@ -260,12 +264,32 @@ async def build_static_site(out_dir: Path, prev_site_url: str | None, seed_local
             if sub_path.exists():
                 try:
                     existing_subs = json.loads(sub_path.read_text(encoding="utf-8"))
-                    if isinstance(existing_subs, list) and existing_subs and not all("paragraph" in s for s in existing_subs):
-                        upgraded_subs = upgrade_subtitles_with_paragraphs(existing_subs)
-                        sub_path.write_text(json.dumps(upgraded_subs, ensure_ascii=False, indent=2), encoding="utf-8")
-                        ep["subtitle_count"] = len(upgraded_subs)
+                    changed = False
+                    if isinstance(existing_subs, list) and existing_subs:
+                        if not all("paragraph" in s for s in existing_subs):
+                            existing_subs = upgrade_subtitles_with_paragraphs(existing_subs)
+                            changed = True
+                        # Auto-repair any lines that fell back to untranslated English
+                        if repaired_lines_total < MAX_REPAIR_LINES_PER_RUN:
+                            missing_idxs = [
+                                i for i, s in enumerate(existing_subs)
+                                if (s.get("en") or "").strip() and not CJK_RE.search(s.get("zh") or "")
+                            ]
+                            if missing_idxs:
+                                budget = MAX_REPAIR_LINES_PER_RUN - repaired_lines_total
+                                to_fix = missing_idxs[:budget]
+                                logger.info("Repairing %d untranslated Chinese lines in %s...", len(to_fix), ep_id)
+                                fixed_zh = _translate_batch_en_to_zh([existing_subs[i]["en"] for i in to_fix])
+                                for i_pos, zh_val in zip(to_fix, fixed_zh):
+                                    if CJK_RE.search(zh_val or ""):
+                                        existing_subs[i_pos]["zh"] = zh_val
+                                        changed = True
+                                repaired_lines_total += len(to_fix)
+                        if changed:
+                            sub_path.write_text(json.dumps(existing_subs, ensure_ascii=False, indent=2), encoding="utf-8")
+                            ep["subtitle_count"] = len(existing_subs)
                 except Exception as exc:
-                    logger.warning("Failed upgrading paragraphs for %s: %s", ep_id, exc)
+                    logger.warning("Failed upgrading/repairing subtitles for %s: %s", ep_id, exc)
                 valid_sub_ids.add(ep_id)
                 ep["has_subtitles"] = True
                 ep["static_subtitle_path"] = f"data/subtitles/{ep_id}.json"
